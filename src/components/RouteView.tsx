@@ -4,6 +4,8 @@ import { useStore } from '../store'
 import { STOP_COLORS, fmtMoney, sortStops, uid } from '../lib/plan'
 import { addDays, dateRange, daysBetween, fmtDay, fmtShort } from '../lib/dates'
 import { StopForm } from './forms'
+import { CurrencyFields } from './CurrencyFields'
+import { currencySymbol } from '../lib/currency'
 import { Empty, Field } from './ui'
 
 export function RouteView({ trip }: { trip: Trip }) {
@@ -27,7 +29,7 @@ export function RouteView({ trip }: { trip: Trip }) {
         city: '',
         start,
         end: end > start ? end : addDays(start, 1),
-        stayCurrency: 'JPY',
+        stayCurrency: trip.localCurrency,
         booked: false,
         color: STOP_COLORS[trip.stops.length % STOP_COLORS.length],
       },
@@ -59,7 +61,7 @@ export function RouteView({ trip }: { trip: Trip }) {
 
       {stops.length === 0 ? (
         <Empty title="Nog geen route">
-          Voeg de steden toe waar je overnacht, bijvoorbeeld Tokyo → Kyoto → Osaka. Je planning per dag vult zich dan
+          Voeg de steden toe waar je overnacht, bijvoorbeeld Lissabon → Porto → Madrid. Je planning per dag vult zich dan
           automatisch met de juiste stad.
         </Empty>
       ) : (
@@ -104,6 +106,7 @@ export function RouteView({ trip }: { trip: Trip }) {
 
       {editing && (
         <StopForm
+          trip={trip}
           initial={editing.stop}
           onClose={() => setEditing(null)}
           onDelete={
@@ -138,7 +141,9 @@ function TripSettings({ trip }: { trip: Trip }) {
       <summary>
         <strong>Reisgegevens</strong>
         <small className="muted">
-          {fmtDay(trip.startDate)} – {fmtDay(trip.endDate)} · {trip.travelers} reizigers · €1 = ¥{trip.jpyPerEur}
+          {fmtDay(trip.startDate)} – {fmtDay(trip.endDate)} · {trip.travelers} reizigers
+          {trip.localCurrency !== trip.homeCurrency &&
+            ` · ${currencySymbol(trip.homeCurrency)} 1 = ${currencySymbol(trip.localCurrency)} ${trip.rate}`}
         </small>
       </summary>
       <div className="form-grid">
@@ -168,14 +173,7 @@ function TripSettings({ trip }: { trip: Trip }) {
             onChange={(e) => set((t) => void (t.travelers = Math.max(1, Number(e.target.value) || 1)))}
           />
         </Field>
-        <Field label="Wisselkoers (¥ per €1)">
-          <input
-            type="number"
-            min={1}
-            value={trip.jpyPerEur}
-            onChange={(e) => set((t) => void (t.jpyPerEur = Number(e.target.value) || 1))}
-          />
-        </Field>
+        <CurrencyFields value={trip} onChange={(v) => set((t) => void Object.assign(t, v))} />
       </div>
     </details>
   )

@@ -82,22 +82,35 @@ export function fitIdea(idea: Idea, trip: Trip, days: DayInfo[]): Fit {
     : { kind: 'full', city: idea.city!, options }
 }
 
-export const toEUR = (amount: number, currency: Currency, jpyPerEur: number) =>
-  currency === 'EUR' ? amount : amount / (jpyPerEur || 1)
+/** Rekent een bedrag om naar de thuisvaluta van de reis. */
+export const toHome = (amount: number, currency: Currency, trip: Trip) =>
+  currency === trip.localCurrency && currency !== trip.homeCurrency ? amount / (trip.rate || 1) : amount
 
-export const fmtMoney = (amount: number, currency: Currency) =>
-  new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: currency === 'JPY' ? 0 : 2,
-  }).format(amount)
+export const fmtMoney = (amount: number, currency: Currency) => {
+  try {
+    return new Intl.NumberFormat('nl-NL', { style: 'currency', currency }).format(amount)
+  } catch {
+    return `${currency} ${amount}`
+  }
+}
 
-export const fmtEUR = (amount: number) =>
-  new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(
-    amount,
-  )
+/** Afgerond bedrag in de thuisvaluta, voor totalen. */
+export const fmtHome = (amount: number, trip: Trip) => {
+  try {
+    return new Intl.NumberFormat('nl-NL', {
+      style: 'currency',
+      currency: trip.homeCurrency,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  } catch {
+    return `${trip.homeCurrency} ${Math.round(amount)}`
+  }
+}
 
-export const STOP_COLORS = ['#d64933', '#3d5a98', '#2f8f6b', '#b07a1f', '#8a4fa3', '#1f8a9e', '#c2577f']
+/** De valuta waartussen je in deze reis kunt kiezen. */
+export const tripCurrencies = (trip: Trip) => [...new Set([trip.localCurrency, trip.homeCurrency])]
+
+export const STOP_COLORS = ['#e0603f', '#3d5a98', '#2e8a62', '#c08a1e', '#8a5bb0', '#2a94b0', '#c9577f']
 
 export const uid = () => crypto.randomUUID()
 

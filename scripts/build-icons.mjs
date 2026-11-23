@@ -13,10 +13,31 @@ const font = (pkg, file) =>
 const fraunces = font('fraunces', 'fraunces-latin-600-normal.woff')
 const jakarta = font('plus-jakarta-sans', 'plus-jakarta-sans-latin-500-normal.woff')
 
-const C = { indigo: '#3d5a98', sun: '#d64933', cream: '#f7f4ee', ink: '#1f2330' }
+/** Merkkleuren, gelijk aan de tokens in src/index.css. */
+const C = {
+  indigo: '#3d5a98',
+  navy: '#22396a',
+  ribbon: '#e0603f',
+  white: '#ffffff',
+  lilac: '#c9d0e2',
+  ink: '#1c2540',
+}
 
-/** Het beeldmerk op een 100×100-raster: een V-vallei met de zon erin. */
-const mark = `<circle cx="50" cy="44" r="11" fill="${C.sun}"/><path d="M24 28 L50 78 L76 28" fill="none" stroke="${C.cream}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`
+/** Het beeldmerk (reisdagboek met lintje) op een 100×100-raster, naar Jay's tekening. */
+const mark = (() => {
+  const x = 26.5
+  const y = 16
+  const dots = [7.6, 21, 34.2, 47.4, 60.4]
+    .map((cy) => `<ellipse cx="${x + 0.6}" cy="${y + cy}" rx="3.2" ry="2.3" fill="${C.navy}"/>`)
+    .join('')
+  return (
+    `<rect x="${x}" y="${y}" width="50.5" height="68" rx="4.5" fill="${C.white}"/>` +
+    `<path d="M${x + 32.4} ${y} H${x + 43.5} V${y + 28} L${x + 37.95} ${y + 23.6} L${x + 32.4} ${y + 28} Z" fill="${C.ribbon}"/>` +
+    `<rect x="${x + 8.9}" y="${y + 36.9}" width="30.8" height="3.8" rx="1.9" fill="${C.lilac}"/>` +
+    `<rect x="${x + 8.9}" y="${y + 44.8}" width="23.2" height="3.8" rx="1.9" fill="${C.lilac}"/>` +
+    dots
+  )
+})()
 
 const svg = (w, h, body) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>\n`
@@ -27,6 +48,8 @@ const icon = svg(100, 100, `<rect width="100" height="100" rx="24" fill="${C.ind
 const iconSquare = svg(100, 100, `<rect width="100" height="100" fill="${C.indigo}"/>${mark}`)
 /** Android 'maskable': inhoud binnen de veilige 80% in het midden. */
 const iconMaskable = svg(100, 100, `<rect width="100" height="100" fill="${C.indigo}"/><g transform="translate(12 12) scale(0.76)">${mark}</g>`)
+/** Alleen het dagboek, voor op een gekleurde achtergrond. */
+const markOnly = svg(100, 100, mark)
 
 /** Eigen serializer: toPathData(n) van opentype.js geeft soms 'NaN' bij afronden. */
 function pathData(p) {
@@ -57,29 +80,73 @@ function text(f, str, x, y, size, fill) {
   return { d: `<path d="${d.join('')}" fill="${fill}"/>`, width: pen - x }
 }
 
-/** Woordmerk: icoon + 'Verre' als paden, zodat het font niet nodig is. */
+const capHeight = fraunces.tables.os2.sCapHeight / fraunces.unitsPerEm
+
+/**
+ * 'Verre' met het lintje achter de e, in de verhoudingen van Jay's ontwerp
+ * (gemeten in kapitaalhoogtes): lintje 0,25 breed, 0,58 hoog, steekt 0,04 boven
+ * de V uit, 0,15 ruimte na de e.
+ */
+function wordmarkParts(x, baseline, size, fill) {
+  const cap = capHeight * size
+  const t = text(fraunces, 'Verre', x, baseline, size, fill)
+  const rx = x + t.width + cap * 0.15
+  const rw = cap * 0.25
+  const rh = cap * 0.58
+  const top = baseline - cap - cap * 0.04
+  const notch = cap * 0.105
+  const ribbon = `<path d="M${rx.toFixed(2)} ${top.toFixed(2)} h${rw.toFixed(2)} v${rh.toFixed(2)} l${(-rw / 2).toFixed(2)} ${(-notch).toFixed(2)} l${(-rw / 2).toFixed(2)} ${notch.toFixed(2)} Z" fill="${C.ribbon}"/>`
+  return { body: t.d + ribbon, width: rx + rw - x, top, cap }
+}
+
 function wordmark(fill) {
-  const t = text(fraunces, 'Verre', 124, 76, 80, fill)
-  const w = Math.ceil(124 + t.width + 4)
-  return svg(w, 100, `<rect width="100" height="100" rx="24" fill="${C.indigo}"/>${mark}${t.d}`)
+  const size = 100
+  const cap = capHeight * size
+  const pad = 4
+  const baseline = pad + cap * 1.04
+  const p = wordmarkParts(pad, baseline, size, fill)
+  return svg(Math.ceil(p.width + pad * 2), Math.ceil(baseline + size * 0.06 + pad), p.body)
+}
+
+/** Icoon + woordmerk naast elkaar. */
+function lockup(fill) {
+  const size = 100
+  const cap = capHeight * size
+  const iconH = cap * 1.6
+  const gap = iconH * 0.45
+  const baseline = (iconH + cap) / 2
+  const p = wordmarkParts(iconH + gap, baseline, size, fill)
+  const s = iconH / 100
+  return svg(
+    Math.ceil(iconH + gap + p.width + 2),
+    Math.ceil(iconH),
+    `<g transform="scale(${s})"><rect width="100" height="100" rx="24" fill="${C.indigo}"/>${mark}</g>${p.body}`,
+  )
 }
 
 function ogImage() {
   const W = 1200
   const H = 630
-  const name = text(fraunces, 'Verre', 0, 0, 150, C.ink)
-  const tag = text(jakarta, 'Plan je reis overzichtelijk', 0, 0, 40, '#6b6f7b')
-  const markSize = 150
-  const rowW = markSize + 40 + name.width
+  const size = 150
+  const cap = capHeight * size
+  // Verhoudingen uit Jay's ontwerp: boekje 1,62× kapitaalhoogte, 2,05× ruimte tot de V.
+  const bookH = cap * 1.62
+  const s = bookH / 68
+  const bookW = 52 * s
+  const gap = cap * 2.05
+  const probe = wordmarkParts(0, 0, size, C.white)
+  const rowW = bookW + gap + probe.width
   const x0 = (W - rowW) / 2
-  const nameX = x0 + markSize + 40
+  const y0 = 200
+  const baseline = y0 + (bookH + cap) / 2
+  const tag = text(jakarta, 'Plan je reis overzichtelijk', 0, 0, 40, C.lilac)
   return svg(
     W,
     H,
-    `<rect width="${W}" height="${H}" fill="${C.cream}"/>` +
-      `<g transform="translate(${x0} 190) scale(${markSize / 100})"><rect width="100" height="100" rx="24" fill="${C.indigo}"/>${mark}</g>` +
-      text(fraunces, 'Verre', nameX, 312, 150, C.ink).d +
-      text(jakarta, 'Plan je reis overzichtelijk', (W - tag.width) / 2, 450, 40, '#6b6f7b').d,
+    `<rect width="${W}" height="${H}" fill="${C.indigo}"/>` +
+      `<g transform="translate(${x0 - 25 * s} ${y0 - 16 * s}) scale(${s})">${mark}</g>` +
+      wordmarkParts(x0 + bookW + gap, baseline, size, C.white).body +
+      text(jakarta, 'Plan je reis overzichtelijk', (W - tag.width) / 2, y0 + bookH + 120, 40, C.lilac).d,
   )
 }
 
@@ -90,8 +157,11 @@ const png = (src, size, file, h = size) =>
     .toFile(out(file))
 
 writeFileSync(out('favicon.svg'), icon)
-writeFileSync(out('logo.svg'), wordmark(C.ink))
-writeFileSync(out('logo-light.svg'), wordmark(C.cream))
+writeFileSync(out('mark-white.svg'), markOnly)
+writeFileSync(out('wordmark.svg'), wordmark(C.ink))
+writeFileSync(out('wordmark-white.svg'), wordmark(C.white))
+writeFileSync(out('logo.svg'), lockup(C.ink))
+writeFileSync(out('logo-white.svg'), lockup(C.white))
 
 await Promise.all([
   png(icon, 32, 'favicon-32.png'),
@@ -111,7 +181,7 @@ writeFileSync(
       description: 'Plan je reis overzichtelijk',
       start_url: '.',
       display: 'standalone',
-      background_color: C.cream,
+      background_color: C.indigo,
       theme_color: C.indigo,
       icons: [
         { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },

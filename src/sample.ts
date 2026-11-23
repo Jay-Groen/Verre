@@ -1,29 +1,20 @@
 import type { Activity, Idea, PackItem, Stop, Trip } from './types'
 import { STOP_COLORS, uid } from './lib/plan'
 
+/** Algemene startlijst; per reis aan te vullen. */
 const PACKING: Record<string, string[]> = {
   'Te regelen vóór vertrek': [
-    'Paspoort (minstens 6 maanden geldig)',
+    'Paspoort of ID-kaart geldig (sommige landen: 6 maanden na terugkomst)',
+    'Visum of reistoestemming nodig?',
     'Reisverzekering',
-    'Visit Japan Web invullen (QR-codes voor douane)',
-    'JR Pass of losse Shinkansen-tickets',
-    'eSIM of pocket wifi',
-    'Pinpas met wereldwijde dekking / creditcard',
+    'Vaccinaties checken',
+    'Mobiel internet (eSIM of bundel)',
+    'Pinpas en creditcard werken in het buitenland',
   ],
-  Documenten: ['Paspoort', 'Vliegtickets', 'Hotelbevestigingen', 'Kopie paspoort (digitaal)'],
-  Elektronica: [
-    'Stekker-adapter type A',
-    'Powerbank (in handbagage)',
-    'Telefoonoplader',
-    'Koptelefoon',
-  ],
-  Kleding: ['Makkelijk uit te trekken schoenen', 'Sokken zonder gaten (tempels & ryokans)', 'Regenjas'],
-  Overig: [
-    'Muntportemonnee (veel cash & munten)',
-    'Kleine handdoek (veel toiletten zonder droger)',
-    'Zakje voor afval (weinig prullenbakken)',
-    'Suica / Pasmo IC-kaart in Wallet',
-  ],
+  Documenten: ['Paspoort / ID-kaart', 'Vlieg- of treintickets', 'Verblijfsbevestigingen', 'Kopie paspoort (digitaal)'],
+  Elektronica: ['Stekker-adapter', 'Powerbank (in handbagage)', 'Telefoonoplader', 'Koptelefoon'],
+  Kleding: ['Goede wandelschoenen', 'Regenjas', 'Zwemkleding'],
+  Overig: ['Toilettas', 'Medicijnen', 'Zonnebrand', 'Herbruikbare waterfles'],
 }
 
 export function defaultPacking(): PackItem[] {
@@ -147,8 +138,10 @@ export function sampleJapanTrip(): Trip {
     startDate: '2027-04-01',
     endDate: '2027-04-15',
     travelers: 2,
-    jpyPerEur: 165,
-    budgetEUR: 6500,
+    homeCurrency: 'EUR',
+    localCurrency: 'JPY',
+    rate: 165,
+    budget: 6500,
     stops,
     activities,
     ideas,

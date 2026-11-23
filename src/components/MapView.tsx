@@ -6,6 +6,9 @@ import type { Trip } from '../types'
 import { buildDays, fitIdea, sortStops } from '../lib/plan'
 import { fmtDay } from '../lib/dates'
 
+/** Wereldkaart als niets bekend is. */
+const WORLD: LatLngTuple = [25, 10]
+
 function FitBounds({ points }: { points: LatLngTuple[] }) {
   const map = useMap()
   const key = JSON.stringify(points)
@@ -16,10 +19,72 @@ function FitBounds({ points }: { points: LatLngTuple[] }) {
   return null
 }
 
+/** Vraagt de huidige locatie op (met toestemming van de browser). */
+function locate(): Promise<LatLngTuple | null> {
+  return new Promise((resolve) => {
+    if (!('geolocation' in navigator)) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve([p.coords.latitude, p.coords.longitude]),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 600_000 },
+    )
+  })
+}
+
+/** Zonder plekken in de reis start de kaart op je huidige locatie. */
+function StartAtUser({ enabled, onFound }: { enabled: boolean; onFound: (p: LatLngTuple) => void }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!enabled) return
+    let cancelled = false
+    locate().then((p) => {
+      if (!p || cancelled) return
+      onFound(p)
+      map.setView(p, 11)
+    })
+    return () => {
+      cancelled = true
+    }
+    // Alleen bij het openen van de kaart.
+  }, [enabled, map]) // eslint-disable-line react-hooks/exhaustive-deps
+  return null
+}
+
+function LocateButton({ onFound }: { onFound: (p: LatLngTuple) => void }) {
+  const map = useMap()
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  return (
+    <div className="leaflet-top leaflet-right">
+      <div className="leaflet-control">
+        <button
+          type="button"
+          className="map-locate"
+          disabled={busy}
+          title={failed ? 'Locatie niet beschikbaar (geen toestemming?)' : 'Ga naar mijn locatie'}
+          onClick={async () => {
+            setBusy(true)
+            const p = await locate()
+            setBusy(false)
+            setFailed(!p)
+            if (p) {
+              onFound(p)
+              map.flyTo(p, 13)
+            }
+          }}
+        >
+          {busy ? 'Zoeken…' : failed ? 'Geen locatie' : 'Mijn locatie'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function MapView({ trip }: { trip: Trip }) {
   const days = useMemo(() => buildDays(trip), [trip])
   const [day, setDay] = useState<string>('all')
   const [showIdeas, setShowIdeas] = useState(true)
+  const [me, setMe] = useState<LatLngTuple | null>(null)
   const stops = sortStops(trip.stops).filter((s) => s.lat !== undefined && s.lng !== undefined)
 
   const dayInfo = days.find((d) => d.date === day)
@@ -67,12 +132,25 @@ export function MapView({ trip }: { trip: Trip }) {
         </span>
       </div>
       <div className="map-wrap">
-        <MapContainer center={[36.2, 138.25]} zoom={5} scrollWheelZoom className="map">
+        <MapContainer center={WORLD} zoom={2} scrollWheelZoom className="map">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitBounds points={points} />
+          <StartAtUser enabled={points.length === 0} onFound={setMe} />
+          <LocateButton onFound={setMe} />
+          {me && (
+            <CircleMarker
+              center={me}
+              radius={8}
+              pathOptions={{ color: '#fff', weight: 3, fillColor: '#2f7de1', fillOpacity: 1 }}
+            >
+              <Tooltip direction="top" offset={[0, -6]}>
+                Je bent hier
+              </Tooltip>
+            </CircleMarker>
+          )}
           {day === 'all' && stops.length > 1 && (
             <Polyline
               positions={stops.map((s) => [s.lat!, s.lng!] as LatLngTuple)}
@@ -82,7 +160,7 @@ export function MapView({ trip }: { trip: Trip }) {
           {dayInfo && actsSorted.length > 1 && (
             <Polyline
               positions={actsSorted.map((a) => [a.place!.lat!, a.place!.lng!] as LatLngTuple)}
-              pathOptions={{ color: dayInfo.stop?.color ?? '#d64933', weight: 3, opacity: 0.6 }}
+              pathOptions={{ color: dayInfo.stop?.color ?? '#e0603f', weight: 3, opacity: 0.6 }}
             />
           )}
           {visibleStops.map((s) => (
@@ -128,7 +206,7 @@ export function MapView({ trip }: { trip: Trip }) {
               key={i.id}
               center={[i.place!.lat!, i.place!.lng!]}
               radius={6}
-              pathOptions={{ color: '#b07a1f', weight: 2, dashArray: '2 3', fillColor: '#f4d58d', fillOpacity: 0.8 }}
+              pathOptions={{ color: '#e0603f', weight: 2, dashArray: '2 3', fillColor: '#f6c2b2', fillOpacity: 0.9 }}
             >
               <Tooltip direction="top" offset={[0, -6]}>
                 💡 {i.title}

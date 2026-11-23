@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Activity, Trip } from '../types'
 import { useStore } from '../store'
-import { buildDays, fitIdea, fmtHours, fmtMoney, norm, type DayInfo } from '../lib/plan'
+import { buildDays, fitIdea, fmtHome, fmtHours, fmtMoney, norm, toHome, type DayInfo } from '../lib/plan'
 import { fmtLong } from '../lib/dates'
 import { moveActivity, newActivity, planIdea } from '../lib/actions'
 import { ActivityForm } from './forms'
@@ -48,7 +48,7 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
         const over = d.loadH > d.capacityH
         const suggestions = openIdeasFor(d)
         const dayCost = d.activities.reduce(
-          (n, a) => n + (a.cost ? (a.currency === 'JPY' ? a.cost : a.cost * trip.jpyPerEur) : 0),
+          (n, a) => n + (a.cost ? toHome(a.cost, a.currency, trip) : 0),
           0,
         )
         return (
@@ -137,7 +137,7 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
                 </button>
               )}
               <span className="spacer" />
-              {dayCost > 0 && <small className="muted">≈ {fmtMoney(dayCost, 'JPY')}</small>}
+              {dayCost > 0 && <small className="muted">≈ {fmtHome(dayCost, trip)} p.p.</small>}
               {d.stop?.stayName && (
                 <small className="muted">
                   🛏️ {d.stop.stayName}

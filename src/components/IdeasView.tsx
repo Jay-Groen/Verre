@@ -82,7 +82,7 @@ export function IdeasView({ trip }: { trip: Trip }) {
               </button>
             ))}
           </div>
-          <button className="btn primary" onClick={() => setEditing({ idea: newIdea(), isNew: true })}>
+          <button className="btn primary" onClick={() => setEditing({ idea: newIdea(trip), isNew: true })}>
             + Idee toevoegen
           </button>
         </div>
@@ -102,7 +102,7 @@ export function IdeasView({ trip }: { trip: Trip }) {
               <h3>{g.title}</h3>
               {g.sub && <small className="muted">{g.sub}</small>}
               {g.onRoute && (
-                <button className="btn small ghost" onClick={() => setEditing({ idea: newIdea(g.title), isNew: true })}>
+                <button className="btn small ghost" onClick={() => setEditing({ idea: newIdea(trip, g.title), isNew: true })}>
                   + idee in {g.title}
                 </button>
               )}

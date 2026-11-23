@@ -39,9 +39,9 @@ export function planIdea(trip: Trip, ideaId: string, date: string) {
 }
 
 export function newActivity(trip: Trip, date: string): Activity {
-  return { id: uid(), date, title: '', durationH: 2, currency: 'JPY', order: nextOrder(trip, date) }
+  return { id: uid(), date, title: '', durationH: 2, currency: trip.localCurrency, order: nextOrder(trip, date) }
 }
 
-export function newIdea(city?: string): Idea {
-  return { id: uid(), title: '', city, category: 'Bezienswaardigheid', durationH: 2, currency: 'JPY', priority: 2, dropped: false }
+export function newIdea(trip: Trip, city?: string): Idea {
+  return { id: uid(), title: '', city, category: 'Bezienswaardigheid', durationH: 2, currency: trip.localCurrency, priority: 2, dropped: false }
 }

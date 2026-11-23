@@ -7,9 +7,10 @@ Verre is een web-app om een reis overzichtelijk te plannen: verzamel ideeën, zi
 - **Planning**: een kaart per dag met de stad waar je bent, reisdagen, geplande activiteiten (sleep ze naar een andere dag of volgorde) en een balk die laat zien hoe vol de dag is.
 - **Ideeën**: alles wat je tegenkomt, per stad gegroepeerd. Bij elk idee zie je of het al ingepland is, op welke dagen het nog past (met vrije uren), of de dagen in die stad vol zitten, of dat de plek niet op je route ligt.
 - **Route & verblijven**: je steden in volgorde, met hotel, check-in/out, kosten en of het al geboekt is. Je krijgt een waarschuwing bij nachten zonder verblijf of dubbele boekingen.
-- **Kaart**: verblijven, activiteiten en open ideeën op een OpenStreetMap-kaart, voor de hele reis of per dag.
-- **Budget**: kosten in ¥ en €, met verblijven en activiteiten automatisch meegeteld, per categorie en afgezet tegen je budget.
-- **Paklijst**: een afvinklijst met een startlijst voor Japan.
+- **Kaart**: verblijven, activiteiten en open ideeën op een OpenStreetMap-kaart, voor de hele reis of per dag. Zonder plekken start de kaart op je huidige locatie.
+- **Budget**: kosten in de valuta van je bestemming én je eigen valuta (met actuele wisselkoers via frankfurter.dev), met verblijven en activiteiten automatisch meegeteld, per categorie en afgezet tegen je budget.
+- **Paklijst**: een afvinklijst met een algemene startlijst.
+- **Licht en donker**: volgt de instelling van je browser, met een knop rechtsboven om te wisselen.
 
 ## Starten
 

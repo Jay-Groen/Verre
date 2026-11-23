@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Currency, Place } from '../types'
+import { currencySymbol } from '../lib/currency'
 
 export function Modal({
   title,
@@ -45,12 +46,16 @@ export function Field({ label, children, wide }: { label: string; children: Reac
 export function MoneyInput({
   amount,
   currency,
+  currencies,
   onChange,
 }: {
   amount?: number
   currency: Currency
+  /** Valuta om uit te kiezen (lokaal en thuis). */
+  currencies: Currency[]
   onChange: (amount: number | undefined, currency: Currency) => void
 }) {
+  const options = currencies.includes(currency) ? currencies : [currency, ...currencies]
   return (
     <div className="money-input">
       <input
@@ -61,10 +66,17 @@ export function MoneyInput({
         placeholder="0"
         onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value), currency)}
       />
-      <select value={currency} onChange={(e) => onChange(amount, e.target.value as Currency)}>
-        <option value="JPY">¥</option>
-        <option value="EUR">€</option>
-      </select>
+      {options.length > 1 ? (
+        <select value={currency} onChange={(e) => onChange(amount, e.target.value)} aria-label="Valuta">
+          {options.map((c) => (
+            <option key={c} value={c}>
+              {currencySymbol(c)}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="money-unit">{currencySymbol(currency)}</span>
+      )}
     </div>
   )
 }
@@ -80,7 +92,7 @@ export function PlaceInput({
   value,
   onChange,
   context,
-  placeholder = 'Bijv. Fushimi Inari',
+  placeholder = 'Bijv. Sagrada Família',
 }: {
   value?: Place
   onChange: (p: Place | undefined) => void
@@ -95,7 +107,7 @@ export function PlaceInput({
     if (!name.trim()) return
     setBusy(true)
     try {
-      const q = [name, context, 'Japan'].filter(Boolean).join(', ')
+      const q = [name, context].filter(Boolean).join(', ')
       const res = await fetch(
         'https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=nl&q=' +
           encodeURIComponent(q),
@@ -163,6 +175,16 @@ export function PlaceInput({
         </ul>
       )}
     </div>
+  )
+}
+
+/** 'Verre' met het lintje, als echte tekst zodat het meekleurt met het thema. */
+export function Wordmark() {
+  return (
+    <span className="wordmark" aria-label="Verre">
+      Verre
+      <span className="ribbon" aria-hidden />
+    </span>
   )
 }
 

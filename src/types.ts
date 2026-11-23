@@ -1,4 +1,5 @@
-export type Currency = 'JPY' | 'EUR'
+/** ISO 4217-valutacode, bijv. 'EUR' of 'JPY'. */
+export type Currency = string
 
 export interface Place {
   name: string
@@ -102,9 +103,14 @@ export interface Trip {
   startDate: string
   endDate: string
   travelers: number
-  /** Hoeveel yen je krijgt voor 1 euro. */
-  jpyPerEur: number
-  budgetEUR?: number
+  /** Valuta waarin je rekent (meestal EUR). */
+  homeCurrency: Currency
+  /** Valuta op de bestemming. */
+  localCurrency: Currency
+  /** Hoeveel lokale valuta je krijgt voor 1 eenheid thuisvaluta. */
+  rate: number
+  /** Budget in thuisvaluta. */
+  budget?: number
   stops: Stop[]
   activities: Activity[]
   ideas: Idea[]

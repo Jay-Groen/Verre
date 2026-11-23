@@ -2,8 +2,9 @@ import { useState } from 'react'
 import type { Currency, Expense, ExpenseCategory, Trip } from '../types'
 import { EXPENSE_CATEGORIES } from '../types'
 import { useStore } from '../store'
-import { fmtEUR, fmtMoney, sortStops, toEUR, uid } from '../lib/plan'
+import { fmtHome, fmtMoney, sortStops, toHome, tripCurrencies, uid } from '../lib/plan'
 import { MoneyInput } from './ui'
+import { currencySymbol } from '../lib/currency'
 
 interface Line {
   key: string
@@ -17,8 +18,10 @@ interface Line {
 
 export function BudgetView({ trip }: { trip: Trip }) {
   const update = useStore((s) => s.update)
+  const blank = (category: ExpenseCategory = 'Vervoer'): Expense => ({ id: uid(), title: '', amount: 0, currency: trip.localCurrency, category, paid: false })
   const [draft, setDraft] = useState<Expense>(() => blank())
-  const eur = (a: number, c: Currency) => toEUR(a, c, trip.jpyPerEur)
+  const eur = (a: number, c: Currency) => toHome(a, c, trip)
+  const fmtTotal = (a: number) => fmtHome(a, trip)
 
   const lines: Line[] = [
     ...trip.expenses.map((e) => ({ key: e.id, title: e.title, amount: e.amount, currency: e.currency, category: e.category, source: 'expense' as const, paid: e.paid })),
@@ -36,32 +39,32 @@ export function BudgetView({ trip }: { trip: Trip }) {
     v: lines.filter((l) => l.category === c).reduce((n, l) => n + eur(l.amount, l.currency), 0),
   })).filter((x) => x.v > 0)
   const max = Math.max(1, ...byCat.map((x) => x.v))
-  const budget = trip.budgetEUR
+  const budget = trip.budget
 
   return (
     <div className="budget">
       <div className="kpis">
         <div className="kpi">
           <small>Totaal gepland</small>
-          <strong>{fmtEUR(total)}</strong>
-          <small className="muted">{fmtEUR(total / trip.travelers)} p.p.</small>
+          <strong>{fmtTotal(total)}</strong>
+          <small className="muted">{fmtTotal(total / trip.travelers)} p.p.</small>
         </div>
         <div className="kpi">
           <small>Al betaald / geboekt</small>
-          <strong>{fmtEUR(paid)}</strong>
-          <small className="muted">nog {fmtEUR(total - paid)}</small>
+          <strong>{fmtTotal(paid)}</strong>
+          <small className="muted">nog {fmtTotal(total - paid)}</small>
         </div>
         <div className="kpi">
           <small>Budget</small>
           <div className="row tight">
-            <span>€</span>
+            <span>{currencySymbol(trip.homeCurrency)}</span>
             <input
               type="number"
               min={0}
               className="budget-input"
               value={budget ?? ''}
               placeholder="instellen"
-              onChange={(e) => update((t) => void (t.budgetEUR = e.target.value ? Number(e.target.value) : undefined))}
+              onChange={(e) => update((t) => void (t.budget = e.target.value ? Number(e.target.value) : undefined))}
             />
           </div>
           {budget ? (
@@ -70,7 +73,7 @@ export function BudgetView({ trip }: { trip: Trip }) {
                 <span style={{ width: `${Math.min(100, (total / budget) * 100)}%` }} />
               </div>
               <small className={total > budget ? 'warn-text' : 'muted'}>
-                {total > budget ? `${fmtEUR(total - budget)} over budget` : `${fmtEUR(budget - total)} over`}
+                {total > budget ? `${fmtTotal(total - budget)} over budget` : `${fmtTotal(budget - total)} over`}
               </small>
             </>
           ) : null}
@@ -87,7 +90,7 @@ export function BudgetView({ trip }: { trip: Trip }) {
                 <div className="bar">
                   <span style={{ width: `${(v / max) * 100}%` }} />
                 </div>
-                <strong>{fmtEUR(v)}</strong>
+                <strong>{fmtTotal(v)}</strong>
               </li>
             ))}
           </ul>
@@ -105,8 +108,8 @@ export function BudgetView({ trip }: { trip: Trip }) {
             setDraft(blank(draft.category))
           }}
         >
-          <input placeholder="Omschrijving, bijv. Shinkansen Tokyo → Kyoto" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-          <MoneyInput amount={draft.amount || undefined} currency={draft.currency} onChange={(amount, currency) => setDraft({ ...draft, amount: amount ?? 0, currency })} />
+          <input placeholder="Omschrijving, bijv. trein Lissabon → Porto" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          <MoneyInput amount={draft.amount || undefined} currency={draft.currency} currencies={tripCurrencies(trip)} onChange={(amount, currency) => setDraft({ ...draft, amount: amount ?? 0, currency })} />
           <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as ExpenseCategory })}>
             {EXPENSE_CATEGORIES.map((c) => (
               <option key={c}>{c}</option>
@@ -120,7 +123,7 @@ export function BudgetView({ trip }: { trip: Trip }) {
               <th>Omschrijving</th>
               <th>Categorie</th>
               <th className="num">Bedrag</th>
-              <th className="num">In €</th>
+              <th className="num">In {currencySymbol(trip.homeCurrency)}</th>
               <th>Betaald</th>
               <th />
             </tr>
@@ -134,7 +137,7 @@ export function BudgetView({ trip }: { trip: Trip }) {
                 </td>
                 <td>{l.category}</td>
                 <td className="num">{fmtMoney(l.amount, l.currency)}</td>
-                <td className="num">{fmtEUR(eur(l.amount, l.currency))}</td>
+                <td className="num">{fmtTotal(eur(l.amount, l.currency))}</td>
                 <td>
                   {l.source === 'expense' ? (
                     <input
@@ -172,4 +175,3 @@ export function BudgetView({ trip }: { trip: Trip }) {
   )
 }
 
-const blank = (category: ExpenseCategory = 'Vervoer'): Expense => ({ id: uid(), title: '', amount: 0, currency: 'JPY', category, paid: false })

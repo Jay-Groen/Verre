@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Activity, Idea, Stop, Trip } from '../types'
 import { IDEA_CATEGORIES } from '../types'
 import { Field, Modal, MoneyInput, PlaceInput } from './ui'
-import { buildDays, sortStops } from '../lib/plan'
+import { buildDays, sortStops, tripCurrencies } from '../lib/plan'
 import { fmtDay } from '../lib/dates'
 
 function Footer({ onDelete, onCancel, canSave }: { onDelete?: () => void; onCancel: () => void; canSave: boolean }) {
@@ -80,7 +80,7 @@ export function ActivityForm({
           />
         </Field>
         <Field label="Kosten">
-          <MoneyInput amount={a.cost} currency={a.currency} onChange={(cost, currency) => set({ cost, currency })} />
+          <MoneyInput amount={a.cost} currency={a.currency} currencies={tripCurrencies(trip)} onChange={(cost, currency) => set({ cost, currency })} />
         </Field>
         <Field label="Locatie" wide>
           <PlaceInput value={a.place} context={city} onChange={(place) => set({ place })} />
@@ -168,7 +168,7 @@ export function IdeaForm({
           />
         </Field>
         <Field label="Geschatte kosten">
-          <MoneyInput amount={i.cost} currency={i.currency} onChange={(cost, currency) => set({ cost, currency })} />
+          <MoneyInput amount={i.cost} currency={i.currency} currencies={tripCurrencies(trip)} onChange={(cost, currency) => set({ cost, currency })} />
         </Field>
         <Field label="Link (blog, Instagram, website…)" wide>
           <input type="url" value={i.link ?? ''} placeholder="https://" onChange={(e) => set({ link: e.target.value || undefined })} />
@@ -185,11 +185,13 @@ export function IdeaForm({
 }
 
 export function StopForm({
+  trip,
   initial,
   onSave,
   onDelete,
   onClose,
 }: {
+  trip: Trip
   initial: Stop
   onSave: (s: Stop) => void
   onDelete?: () => void
@@ -213,7 +215,7 @@ export function StopForm({
         }}
       >
         <Field label="Stad" wide>
-          <input autoFocus value={s.city} placeholder="Bijv. Kyoto" onChange={(e) => set({ city: e.target.value })} />
+          <input autoFocus value={s.city} placeholder="Bijv. Lissabon" onChange={(e) => set({ city: e.target.value })} />
         </Field>
         <Field label="Aankomst (eerste nacht)">
           <input type="date" value={s.start} onChange={(e) => set({ start: e.target.value })} />
@@ -242,6 +244,7 @@ export function StopForm({
           <MoneyInput
             amount={s.stayCost}
             currency={s.stayCurrency}
+            currencies={tripCurrencies(trip)}
             onChange={(stayCost, stayCurrency) => set({ stayCost, stayCurrency })}
           />
         </Field>

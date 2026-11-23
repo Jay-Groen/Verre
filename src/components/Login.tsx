@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
+import { Wordmark } from './ui'
 
-export function Login() {
+export function Login({ themeButton }: { themeButton: ReactNode }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'magic' | 'password' | 'signup'>('magic')
@@ -28,9 +29,11 @@ export function Login() {
 
   return (
     <div className="login">
+      <div className="login-corner">{themeButton}</div>
       <div className="login-card">
         <div className="brand big">
-          <img className="logo" src="/favicon.svg" alt="" /> Verre
+          <img className="logo" src="/favicon.svg" alt="" />
+          <Wordmark />
         </div>
         <p className="muted">Plan je reis overzichtelijk: ideeën, dagen, verblijven, kaart en budget op één plek.</p>
         <div className="seg">

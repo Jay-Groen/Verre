@@ -4,7 +4,7 @@
   "description": "Plan je reis overzichtelijk",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f7f4ee",
+  "background_color": "#3d5a98",
   "theme_color": "#3d5a98",
   "icons": [
     {

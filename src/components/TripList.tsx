@@ -3,12 +3,14 @@ import { useStore } from '../store'
 import { sampleJapanTrip } from '../sample'
 import { daysBetween, fmtDay, todayIso } from '../lib/dates'
 import { Field, Modal } from './ui'
+import { CurrencyFields } from './CurrencyFields'
 import { addDays } from '../lib/dates'
 
 export function TripList() {
   const { trips, select, createTrip, addTrip, deleteTrip, localTrips, importLocal, mode } = useStore()
   const [creating, setCreating] = useState(false)
-  const [name, setName] = useState('Japan')
+  const [name, setName] = useState('')
+  const [money, setMoney] = useState({ homeCurrency: 'EUR', localCurrency: 'EUR', rate: 1 })
   const [start, setStart] = useState(addDays(todayIso(), 90))
   const [end, setEnd] = useState(addDays(todayIso(), 103))
 
@@ -17,7 +19,7 @@ export function TripList() {
       <div className="section-head">
         <h1>Mijn reizen</h1>
         <div className="row">
-          <button className="btn ghost" onClick={() => addTrip(sampleJapanTrip())}>Voorbeeldreis Japan</button>
+          <button className="btn ghost" onClick={() => addTrip(sampleJapanTrip())}>Voorbeeldreis bekijken</button>
           <button className="btn primary" onClick={() => setCreating(true)}>+ Nieuwe reis</button>
         </div>
       </div>
@@ -93,12 +95,12 @@ export function TripList() {
             className="form-grid"
             onSubmit={(e) => {
               e.preventDefault()
-              createTrip({ name: name.trim(), startDate: start, endDate: end })
+              createTrip({ name: name.trim(), startDate: start, endDate: end, ...money })
               setCreating(false)
             }}
           >
             <Field label="Naam" wide>
-              <input autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+              <input autoFocus value={name} placeholder="Bijv. Roadtrip Portugal" onChange={(e) => setName(e.target.value)} />
             </Field>
             <Field label="Vertrek">
               <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
@@ -106,6 +108,7 @@ export function TripList() {
             <Field label="Terug">
               <input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} />
             </Field>
+            <CurrencyFields value={money} onChange={(v) => setMoney((m) => ({ ...m, ...v }))} />
           </form>
         </Modal>
       )}

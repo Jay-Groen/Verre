@@ -1,4 +1,5 @@
 import type { Trip } from '../types'
+import { normalizeTrip } from './migrate'
 import { supabase } from './supabase'
 
 const LOCAL_KEY = 'reisplanner.trips.v1'
@@ -6,7 +7,7 @@ const LOCAL_KEY = 'reisplanner.trips.v1'
 export function loadLocal(): Trip[] {
   try {
     const raw = localStorage.getItem(LOCAL_KEY)
-    return raw ? (JSON.parse(raw) as Trip[]) : []
+    return raw ? (JSON.parse(raw) as Trip[]).map(normalizeTrip) : []
   } catch {
     return []
   }
@@ -35,7 +36,7 @@ export async function loadRemote(): Promise<Trip[]> {
     .select('id, data')
     .order('updated_at', { ascending: false })
   if (error) throw error
-  return (data ?? []).map((r) => ({ ...(r.data as Trip), id: r.id as string }))
+  return (data ?? []).map((r) => normalizeTrip({ ...(r.data as Trip), id: r.id as string }))
 }
 
 export async function saveRemote(trip: Trip) {
