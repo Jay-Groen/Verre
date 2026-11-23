@@ -1,0 +1,295 @@
+import { useMemo, useState } from 'react'
+import type { Idea, Trip } from '../types'
+import { useStore } from '../store'
+import { buildDays, fitIdea, fmtHours, fmtMoney, norm, sortStops, type DayInfo, type Fit } from '../lib/plan'
+import { fmtDay } from '../lib/dates'
+import { newIdea, planIdea } from '../lib/actions'
+import { IdeaForm } from './forms'
+import { Empty } from './ui'
+
+type Filter = 'all' | 'open' | 'planned'
+
+interface Group {
+  key: string
+  title: string
+  sub?: string
+  days: DayInfo[]
+  ideas: { idea: Idea; fit: Fit }[]
+  onRoute: boolean
+}
+
+export function IdeasView({ trip }: { trip: Trip }) {
+  const update = useStore((s) => s.update)
+  const days = useMemo(() => buildDays(trip), [trip])
+  const [editing, setEditing] = useState<{ idea: Idea; isNew: boolean } | null>(null)
+  const [filter, setFilter] = useState<Filter>('open')
+
+  const all = trip.ideas.map((idea) => ({ idea, fit: fitIdea(idea, trip, days) }))
+  const counts = {
+    planned: all.filter((x) => x.fit.kind === 'planned').length,
+    fits: all.filter((x) => x.fit.kind === 'fits' || x.fit.kind === 'nocity').length,
+    full: all.filter((x) => x.fit.kind === 'full').length,
+    offroute: all.filter((x) => x.fit.kind === 'offroute').length,
+  }
+
+  const shown = all
+    .filter(({ fit }) =>
+      filter === 'all' ? true : filter === 'planned' ? fit.kind === 'planned' : fit.kind !== 'planned' && fit.kind !== 'dropped',
+    )
+    .sort((a, b) => a.idea.priority - b.idea.priority || a.idea.title.localeCompare(b.idea.title))
+
+  // Groepeer per stad in de volgorde van de route.
+  const groups: Group[] = []
+  const routeCities = [...new Set(sortStops(trip.stops).map((s) => s.city))]
+  for (const city of routeCities) {
+    const cityDays = days.filter((d) => norm(d.stop?.city) === norm(city))
+    const free = cityDays.reduce((n, d) => n + Math.max(0, d.capacityH - d.loadH), 0)
+    const ideas = shown.filter((x) => norm(x.idea.city) === norm(city))
+    const openH = all
+      .filter((x) => norm(x.idea.city) === norm(city) && (x.fit.kind === 'fits' || x.fit.kind === 'full'))
+      .reduce((n, x) => n + x.idea.durationH, 0)
+    groups.push({
+      key: city,
+      title: city,
+      sub: `${cityDays.length} ${cityDays.length === 1 ? 'dag' : 'dagen'} · ${fmtHours(free)} vrij · ${fmtHours(openH)} aan open ideeën`,
+      days: cityDays,
+      ideas,
+      onRoute: true,
+    })
+  }
+  const off = shown.filter((x) => x.fit.kind === 'offroute' || (x.fit.kind === 'dropped' && x.idea.city && !routeCities.some((c) => norm(c) === norm(x.idea.city))))
+  if (off.length)
+    groups.push({ key: '__off', title: 'Niet op je route', sub: 'Voeg de plek toe aan je route, of plan het als dagtrip vanuit een stad in de buurt.', days, ideas: off, onRoute: false })
+  const nocity = shown.filter((x) => !norm(x.idea.city))
+  if (nocity.length) groups.push({ key: '__none', title: 'Overal mogelijk', sub: 'Ideeën zonder vaste stad.', days, ideas: nocity, onRoute: false })
+
+  const plan = (id: string, date: string) => update((t) => planIdea(t, id, date))
+
+  return (
+    <div className="ideas">
+      <div className="ideas-top">
+        <div className="stat-row">
+          <Stat n={counts.planned} label="ingepland" tone="ok" />
+          <Stat n={counts.fits} label="passen nog" tone="info" />
+          <Stat n={counts.full} label="krap in tijd" tone="warn" />
+          <Stat n={counts.offroute} label="niet op route" tone="muted" />
+        </div>
+        <div className="row">
+          <div className="seg">
+            {(['open', 'planned', 'all'] as Filter[]).map((f) => (
+              <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
+                {f === 'open' ? 'Nog te plannen' : f === 'planned' ? 'Ingepland' : 'Alles'}
+              </button>
+            ))}
+          </div>
+          <button className="btn primary" onClick={() => setEditing({ idea: newIdea(), isNew: true })}>
+            + Idee toevoegen
+          </button>
+        </div>
+      </div>
+
+      {trip.ideas.length === 0 && (
+        <Empty title="Nog geen ideeën">
+          Verzamel hier alles wat je tegenkomt — van blogs, vrienden of TikTok — en zie direct waar het in je planning past.
+        </Empty>
+      )}
+
+      {groups
+        .filter((g) => g.ideas.length > 0)
+        .map((g) => (
+          <section key={g.key} className="idea-group">
+            <header>
+              <h3>{g.title}</h3>
+              {g.sub && <small className="muted">{g.sub}</small>}
+              {g.onRoute && (
+                <button className="btn small ghost" onClick={() => setEditing({ idea: newIdea(g.title), isNew: true })}>
+                  + idee in {g.title}
+                </button>
+              )}
+            </header>
+            <div className="idea-grid">
+              {g.ideas.map(({ idea, fit }) => (
+                <IdeaCard
+                  key={idea.id}
+                  idea={idea}
+                  fit={fit}
+                  days={days}
+                  onEdit={() => setEditing({ idea, isNew: false })}
+                  onPlan={(date) => plan(idea.id, date)}
+                  onUnplan={() =>
+                    update((t) => {
+                      t.activities = t.activities.filter((a) => a.ideaId !== idea.id)
+                    })
+                  }
+                  onDrop={(dropped) =>
+                    update((t) => {
+                      const i = t.ideas.find((x) => x.id === idea.id)
+                      if (i) i.dropped = dropped
+                    })
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+
+      {editing && (
+        <IdeaForm
+          trip={trip}
+          initial={editing.idea}
+          onClose={() => setEditing(null)}
+          onDelete={
+            editing.isNew
+              ? undefined
+              : () => {
+                  update((t) => {
+                    t.ideas = t.ideas.filter((x) => x.id !== editing.idea.id)
+                    t.activities.forEach((a) => {
+                      if (a.ideaId === editing.idea.id) a.ideaId = undefined
+                    })
+                  })
+                  setEditing(null)
+                }
+          }
+          onSave={(i) => {
+            update((t) => {
+              const old = t.ideas.find((x) => x.id === i.id)
+              if (old) Object.assign(old, i)
+              else t.ideas.push(i)
+            })
+            setEditing(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function Stat({ n, label, tone }: { n: number; label: string; tone: string }) {
+  return (
+    <div className={'stat ' + tone}>
+      <strong>{n}</strong>
+      <span>{label}</span>
+    </div>
+  )
+}
+
+function IdeaCard({
+  idea,
+  fit,
+  days,
+  onEdit,
+  onPlan,
+  onUnplan,
+  onDrop,
+}: {
+  idea: Idea
+  fit: Fit
+  days: DayInfo[]
+  onEdit: () => void
+  onPlan: (date: string) => void
+  onUnplan: () => void
+  onDrop: (dropped: boolean) => void
+}) {
+  const dayNo = (date: string) => (days.find((d) => d.date === date)?.index ?? 0) + 1
+  return (
+    <article className={'idea-card fit-' + fit.kind}>
+      <div className="idea-head">
+        <span className="stars" title="Prioriteit">{'★'.repeat(4 - idea.priority)}</span>
+        <h4 onClick={onEdit}>{idea.title}</h4>
+        <button className="icon-btn" onClick={onEdit} aria-label="Bewerken">✎</button>
+      </div>
+      <div className="idea-meta">
+        <span>{idea.category}</span>
+        <span>{fmtHours(idea.durationH)}</span>
+        {idea.cost ? <span>{fmtMoney(idea.cost, idea.currency)}</span> : null}
+        {idea.place?.lat !== undefined && <span title="Op de kaart">📍</span>}
+        {idea.link && (
+          <a href={idea.link} target="_blank" rel="noreferrer">
+            link ↗
+          </a>
+        )}
+      </div>
+      {idea.notes && <p className="idea-notes">{idea.notes}</p>}
+
+      <div className="fit">
+        {fit.kind === 'planned' && (
+          <>
+            <span>
+              ✅ Gepland op dag {dayNo(fit.activity.date)} · {fmtDay(fit.activity.date)}
+            </span>
+            <button className="link" onClick={onUnplan}>terug naar ideeën</button>
+          </>
+        )}
+        {fit.kind === 'fits' && (
+          <>
+            <span>Past op:</span>
+            <div className="day-chips">
+              {fit.options.slice(0, 4).map((o) => (
+                <button key={o.date} className="day-chip" onClick={() => onPlan(o.date)} title="Klik om hier te plannen">
+                  Dag {dayNo(o.date)} <small>{fmtHours(o.freeH)} vrij</small>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {fit.kind === 'full' && (
+          <>
+            <span>⚠️ Je dagen in {fit.city} zitten vol (max. {fmtHours(Math.max(0, fit.options[0]?.freeH ?? 0))} vrij).</span>
+            <DayPicker days={fit.options.map((o) => o.date)} dayNo={dayNo} onPick={onPlan} label="Toch plannen…" />
+          </>
+        )}
+        {fit.kind === 'offroute' && (
+          <>
+            <span>🧭 {fit.city} staat niet op je route.</span>
+            <DayPicker days={days.map((d) => d.date)} dayNo={dayNo} onPick={onPlan} label="Plan als dagtrip…" />
+          </>
+        )}
+        {fit.kind === 'nocity' && (
+          <DayPicker
+            days={fit.options.map((o) => o.date)}
+            dayNo={dayNo}
+            onPick={onPlan}
+            label="Plan op dag…"
+          />
+        )}
+        {fit.kind === 'dropped' && (
+          <>
+            <span className="muted">Afgevallen</span>
+            <button className="link" onClick={() => onDrop(false)}>terugzetten</button>
+          </>
+        )}
+        {fit.kind !== 'planned' && fit.kind !== 'dropped' && (
+          <button className="link muted" onClick={() => onDrop(true)}>laat vallen</button>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function DayPicker({
+  days,
+  dayNo,
+  onPick,
+  label,
+}: {
+  days: string[]
+  dayNo: (d: string) => number
+  onPick: (d: string) => void
+  label: string
+}) {
+  return (
+    <select
+      className="day-picker"
+      value=""
+      onChange={(e) => e.target.value && onPick(e.target.value)}
+    >
+      <option value="">{label}</option>
+      {[...days].sort().map((d) => (
+        <option key={d} value={d}>
+          Dag {dayNo(d)} · {fmtDay(d)}
+        </option>
+      ))}
+    </select>
+  )
+}
