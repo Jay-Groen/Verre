@@ -43,8 +43,8 @@ function TopBar({ trip }: { trip: Trip | null }) {
   return (
     <header className="topbar">
       <button className="brand" onClick={() => select(null)} title="Alle reizen">
-        <span className="logo">旅</span>
-        <span className="brand-name">Reisplanner</span>
+        <img className="logo" src="/favicon.svg" alt="" />
+        <span className="brand-name">Verre</span>
       </button>
       {trip && (
         <div className="trip-title">

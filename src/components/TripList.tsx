@@ -31,7 +31,7 @@ export function TripList() {
 
       {trips.length === 0 ? (
         <div className="empty hero">
-          <div className="logo huge">旅</div>
+          <img className="logo huge" src="/favicon.svg" alt="" />
           <h2>Waar gaat de reis heen?</h2>
           <p className="muted">
             Begin met een nieuwe reis, of bekijk de voorbeeldreis door Japan om te zien hoe ideeën, dagplanning,

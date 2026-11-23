@@ -30,7 +30,7 @@ export function Login() {
     <div className="login">
       <div className="login-card">
         <div className="brand big">
-          <span className="logo">旅</span> Reisplanner
+          <img className="logo" src="/favicon.svg" alt="" /> Verre
         </div>
         <p className="muted">Plan je reis overzichtelijk: ideeën, dagen, verblijven, kaart en budget op één plek.</p>
         <div className="seg">

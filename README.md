@@ -1,6 +1,6 @@
-# Reisplanner 旅
+# Verre
 
-Een web-app om een reis overzichtelijk te plannen: verzamel ideeën, zie meteen waar ze in je planning passen, en houd dagen, verblijven, kaart, budget en paklijst op één plek bij.
+Verre is een web-app om een reis overzichtelijk te plannen: verzamel ideeën, zie meteen waar ze in je planning passen, en houd dagen, verblijven, kaart, budget en paklijst op één plek bij.
 
 ## Wat zit erin
 

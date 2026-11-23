@@ -1,5 +1,5 @@
 {
-  "name": "reisplanner",
+  "name": "verre",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "icons": "node scripts/build-icons.mjs"
   },
   "dependencies": {
+    "@fontsource/fraunces": "^5.3.0",
+    "@fontsource/plus-jakarta-sans": "^5.3.0",
     "@supabase/supabase-js": "^2.119.2",
     "leaflet": "^1.9.4",
     "react": "^19.3.1",
@@ -23,7 +26,9 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "opentype.js": "^2.0.0",
     "oxlint": "^1.90.0",
+    "sharp": "^0.35.5",
     "typescript": "~7.0.2",
     "vite": "^8.3.6"
   }
