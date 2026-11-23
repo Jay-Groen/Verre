@@ -13,6 +13,7 @@ export function normalizeTrip(raw: Trip & LegacyTrip): Trip {
   if (!t.localCurrency) t.localCurrency = t.jpyPerEur ? 'JPY' : t.homeCurrency
   if (!t.rate) t.rate = t.jpyPerEur ?? 1
   if (t.budget === undefined && t.budgetEUR !== undefined) t.budget = t.budgetEUR
+  if (!t.legs) t.legs = []
   delete t.jpyPerEur
   delete t.budgetEUR
   return t

@@ -8,7 +8,10 @@ import {
   loadRemote,
   saveLocal,
   saveRemote,
+  type Access,
 } from './lib/storage'
+import { normalizeTrip } from './lib/migrate'
+import { removeMember } from './lib/sharing'
 import { defaultPacking } from './sample'
 import { addDays, todayIso } from './lib/dates'
 import { uid } from './lib/plan'
@@ -25,6 +28,8 @@ interface State {
   ready: boolean
   user: User | null
   trips: Trip[]
+  /** Per reis: ben je eigenaar of medereiziger (alleen met account). */
+  access: Record<string, Access>
   currentId: string | null
   save: SaveState
   error?: string
@@ -39,6 +44,8 @@ interface State {
   update: (fn: (t: Trip) => void) => void
   importLocal: () => Promise<void>
   signOut: () => Promise<void>
+  /** Haalt wijzigingen van medereizigers op. */
+  refresh: () => Promise<void>
 }
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -59,7 +66,7 @@ export const useStore = create<State>((set, get) => {
         const latest = get().trips.find((t) => t.id === trip.id)
         if (!latest) return
         try {
-          await saveRemote(latest)
+          await saveRemote(latest, get().access[latest.id]?.owner ?? true)
           if (timers.size === 0) set({ save: 'saved' })
         } catch (e) {
           set({ save: 'error', error: (e as Error).message })
@@ -70,20 +77,50 @@ export const useStore = create<State>((set, get) => {
 
   const loadForUser = async (user: User | null) => {
     if (!user) {
-      set({ user: null, trips: [], currentId: null, ready: true })
+      set({ user: null, trips: [], access: {}, currentId: null, ready: true })
+      stopListening()
       return
     }
     set({ user, ready: false })
     try {
-      const trips = await loadRemote()
-      set({ trips, ready: true, localTrips: loadLocal(), error: undefined })
+      const { trips, access } = await loadRemote(user.id)
+      set({ trips, access, ready: true, localTrips: loadLocal(), error: undefined })
+      listen()
     } catch (e) {
       set({ trips: [], ready: true, error: (e as Error).message })
     }
   }
 
+  // ---- Live bijwerken: Realtime + bij terugkeren naar het tabblad ----
+  let channel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined
+  let lastRefresh = 0
+  const soon = () => {
+    clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => get().refresh(), 400)
+  }
+  const onFocus = () => {
+    if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 15_000) soon()
+  }
+  const listen = () => {
+    if (!supabase || channel) return
+    channel = supabase
+      .channel('trips-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, soon)
+      .subscribe()
+    document.addEventListener('visibilitychange', onFocus)
+    window.addEventListener('focus', onFocus)
+  }
+  const stopListening = () => {
+    if (channel) supabase?.removeChannel(channel)
+    channel = null
+    document.removeEventListener('visibilitychange', onFocus)
+    window.removeEventListener('focus', onFocus)
+  }
+
   return {
     mode: supabase ? 'cloud' : 'local',
+    access: {},
     ready: false,
     user: null,
     trips: [],
@@ -142,6 +179,7 @@ export const useStore = create<State>((set, get) => {
         localCurrency: 'EUR',
         rate: 1,
         stops: [],
+        legs: [],
         activities: [],
         ideas: [],
         expenses: [],
@@ -153,7 +191,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     addTrip: (trip) => {
-      set({ trips: [trip, ...get().trips] })
+      set({ trips: [trip, ...get().trips], access: { ...get().access, [trip.id]: { owner: true } } })
       persist(trip)
       get().select(trip.id)
       return trip.id
@@ -165,7 +203,10 @@ export const useStore = create<State>((set, get) => {
       if (get().mode === 'local') saveLocal(get().trips)
       else {
         try {
-          await deleteRemote(id)
+          const acc = get().access[id]
+          // Een gedeelde reis verlaat je; alleen de eigenaar verwijdert hem echt.
+          if (acc && !acc.owner) await removeMember(id, (get().user?.email ?? '').toLowerCase())
+          else await deleteRemote(id)
         } catch (e) {
           set({ save: 'error', error: (e as Error).message })
         }
@@ -196,6 +237,27 @@ export const useStore = create<State>((set, get) => {
 
     signOut: async () => {
       await supabase?.auth.signOut()
+    },
+
+    refresh: async () => {
+      const user = get().user
+      if (!supabase || !user) return
+      lastRefresh = Date.now()
+      try {
+        const { trips: remote, access } = await loadRemote(user.id)
+        const local = get().trips
+        // Lokale wijzigingen die nog worden opgeslagen, of nieuwer zijn, gaan voor.
+        const merged = remote.map((r) => {
+          const l = local.find((x) => x.id === r.id)
+          return l && (timers.has(l.id) || l.updatedAt >= r.updatedAt) ? l : normalizeTrip(r)
+        })
+        const pendingNew = local.filter((l) => timers.has(l.id) && !remote.some((r) => r.id === l.id))
+        set({ trips: [...pendingNew, ...merged], access: { ...access, ...Object.fromEntries(pendingNew.map((t) => [t.id, { owner: true }])) } })
+        const cur = get().currentId
+        if (cur && !get().trips.some((t) => t.id === cur)) get().select(null)
+      } catch {
+        /* volgende keer opnieuw */
+      }
     },
   }
 })

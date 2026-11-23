@@ -3,6 +3,7 @@ import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip, useMap
 import type { LatLngTuple } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Trip } from '../types'
+import { MODE_ICON } from '../types'
 import { buildDays, fitIdea, sortStops } from '../lib/plan'
 import { fmtDay } from '../lib/dates'
 
@@ -151,12 +152,26 @@ export function MapView({ trip }: { trip: Trip }) {
               </Tooltip>
             </CircleMarker>
           )}
-          {day === 'all' && stops.length > 1 && (
-            <Polyline
-              positions={stops.map((s) => [s.lat!, s.lng!] as LatLngTuple)}
-              pathOptions={{ color: '#3d5a98', weight: 3, dashArray: '6 8', opacity: 0.7 }}
-            />
-          )}
+          {day === 'all' &&
+            stops.slice(1).map((s, i) => {
+              const leg = trip.legs.find((l) => l.toId === s.id)
+              return (
+                <Polyline
+                  key={s.id}
+                  positions={[[stops[i].lat!, stops[i].lng!], [s.lat!, s.lng!]]}
+                  pathOptions={{
+                    color: '#3d5a98',
+                    weight: 3,
+                    dashArray: leg?.mode === 'Vlucht' ? '2 8' : '6 8',
+                    opacity: 0.7,
+                  }}
+                >
+                  <Tooltip sticky>
+                    {leg ? `${MODE_ICON[leg.mode]} ${leg.mode}${leg.carrier ? ` · ${leg.carrier}` : ''}` : '🧭'} {stops[i].city} → {s.city}
+                  </Tooltip>
+                </Polyline>
+              )
+            })}
           {dayInfo && actsSorted.length > 1 && (
             <Polyline
               positions={actsSorted.map((a) => [a.place!.lat!, a.place!.lng!] as LatLngTuple)}

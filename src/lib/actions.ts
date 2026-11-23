@@ -1,4 +1,4 @@
-import type { Activity, Idea, Trip } from '../types'
+import type { Activity, Idea, Leg, Stop, Trip } from '../types'
 import { sortActivities, uid } from './plan'
 
 /** Zet een activiteit op een (andere) dag, optioneel vóór een andere activiteit. */
@@ -44,4 +44,31 @@ export function newActivity(trip: Trip, date: string): Activity {
 
 export function newIdea(trip: Trip, city?: string): Idea {
   return { id: uid(), title: '', city, category: 'Bezienswaardigheid', durationH: 2, currency: trip.localCurrency, priority: 2, dropped: false }
+}
+
+// ---- Opslaan en verwijderen vanuit formulieren (gedeeld door meerdere tabbladen) ----
+
+export function saveStop(trip: Trip, s: Stop) {
+  const old = trip.stops.find((x) => x.id === s.id)
+  if (old) Object.assign(old, s)
+  else trip.stops.push(s)
+}
+
+export function deleteStop(trip: Trip, id: string) {
+  trip.stops = trip.stops.filter((x) => x.id !== id)
+  trip.legs = trip.legs.filter((l) => l.toId !== id)
+}
+
+export function saveLeg(trip: Trip, l: Leg) {
+  trip.legs = trip.legs.filter((x) => x.id !== l.id && x.toId !== l.toId)
+  trip.legs.push(l)
+}
+
+export function saveActivity(trip: Trip, a: Activity) {
+  const old = trip.activities.find((x) => x.id === a.id)
+  if (old && old.date !== a.date) {
+    Object.assign(old, a)
+    moveActivity(trip, a.id, a.date)
+  } else if (old) Object.assign(old, a)
+  else trip.activities.push(a)
 }

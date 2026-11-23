@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import type { Activity, Idea, Stop, Trip } from '../types'
-import { IDEA_CATEGORIES } from '../types'
+import type { Activity, Idea, Leg, Stop, Trip } from '../types'
+import { IDEA_CATEGORIES, MODE_ICON, TRANSPORT_MODES } from '../types'
+import { BookingFields, cleanupRemoved, tidyBooking } from './BookingFields'
+import { fmtDuration, legHours, type LegSlot } from '../lib/legs'
 import { Field, Modal, MoneyInput, PlaceInput } from './ui'
 import { buildDays, sortStops, tripCurrencies } from '../lib/plan'
 import { fmtDay } from '../lib/dates'
@@ -52,7 +54,9 @@ export function ActivityForm({
         className="form-grid"
         onSubmit={(e) => {
           e.preventDefault()
-          onSave({ ...a, title: a.title.trim() })
+          const booking = a.reserve ? tidyBooking(a.booking) : undefined
+          cleanupRemoved(initial.booking, booking)
+          onSave({ ...a, title: a.title.trim(), booking })
         }}
       >
         <Field label="Wat ga je doen?" wide>
@@ -85,6 +89,17 @@ export function ActivityForm({
         <Field label="Locatie" wide>
           <PlaceInput value={a.place} context={city} onChange={(place) => set({ place })} />
         </Field>
+        <Field label="Reserveren">
+          <select
+            value={a.reserve ?? ''}
+            onChange={(e) => set({ reserve: (e.target.value || undefined) as Activity['reserve'] })}
+          >
+            <option value="">Niet nodig</option>
+            <option value="todo">Nog reserveren</option>
+            <option value="booked">Gereserveerd / ticket</option>
+          </select>
+        </Field>
+        {a.reserve && <BookingFields value={a.booking} onChange={(booking) => set({ booking })} />}
         <Field label="Notities" wide>
           <textarea rows={3} value={a.notes ?? ''} onChange={(e) => set({ notes: e.target.value || undefined })} />
         </Field>
@@ -211,7 +226,10 @@ export function StopForm({
         className="form-grid"
         onSubmit={(e) => {
           e.preventDefault()
-          if (valid) onSave({ ...s, city: s.city.trim() })
+          if (!valid) return
+          const booking = tidyBooking(s.booking)
+          cleanupRemoved(initial.booking, booking)
+          onSave({ ...s, city: s.city.trim(), booking })
         }}
       >
         <Field label="Stad" wide>
@@ -253,8 +271,96 @@ export function StopForm({
             <input type="checkbox" checked={s.booked} onChange={(e) => set({ booked: e.target.checked })} /> Geboekt
           </label>
         </Field>
+        <BookingFields value={s.booking} onChange={(booking) => set({ booking })} />
         <Field label="Notities" wide>
           <textarea rows={2} value={s.notes ?? ''} onChange={(e) => set({ notes: e.target.value || undefined })} />
+        </Field>
+      </form>
+    </Modal>
+  )
+}
+
+export function LegForm({
+  trip,
+  slot,
+  initial,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  trip: Trip
+  slot: LegSlot
+  initial: Leg
+  onSave: (l: Leg) => void
+  onDelete?: () => void
+  onClose: () => void
+}) {
+  const [l, setL] = useState(initial)
+  const set = (p: Partial<Leg>) => setL((x) => ({ ...x, ...p }))
+  const hours = legHours({ ...l, durationH: undefined })
+  return (
+    <Modal
+      title={`${slot.fromName} → ${slot.toName}`}
+      onClose={onClose}
+      footer={<Footer onDelete={onDelete} onCancel={onClose} canSave={!!l.date} />}
+    >
+      <form
+        id="modal-form"
+        className="form-grid"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const booking = tidyBooking(l.booking)
+          cleanupRemoved(initial.booking, booking)
+          onSave({ ...l, carrier: l.carrier?.trim() || undefined, booking })
+        }}
+      >
+        <div className="field wide">
+          <span>Vervoer</span>
+          <div className="seg modes">
+            {TRANSPORT_MODES.map((m) => (
+              <button type="button" key={m} className={l.mode === m ? 'on' : ''} onClick={() => set({ mode: m })}>
+                <span aria-hidden>{MODE_ICON[m]}</span> {m}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label={l.mode === 'Vlucht' ? 'Vluchtnummer / maatschappij' : 'Lijn / maatschappij'} wide>
+          <input
+            value={l.carrier ?? ''}
+            placeholder={l.mode === 'Vlucht' ? 'Bijv. KLM KL861' : l.mode === 'Auto' ? 'Bijv. huurauto Sixt' : 'Bijv. Alfa Pendular 123'}
+            onChange={(e) => set({ carrier: e.target.value })}
+          />
+        </Field>
+        <Field label="Datum vertrek">
+          <input type="date" value={l.date} onChange={(e) => set({ date: e.target.value })} />
+        </Field>
+        <Field label="Kosten (totaal, alle reizigers)">
+          <MoneyInput amount={l.cost} currency={l.currency} currencies={tripCurrencies(trip)} onChange={(cost, currency) => set({ cost, currency })} />
+        </Field>
+        <Field label="Vertrektijd">
+          <input type="time" value={l.depart ?? ''} onChange={(e) => set({ depart: e.target.value || undefined })} />
+        </Field>
+        <Field label="Aankomsttijd (lokaal)">
+          <input type="time" value={l.arrive ?? ''} onChange={(e) => set({ arrive: e.target.value || undefined })} />
+        </Field>
+        <Field label="Reisduur in uren (bij tijdverschil)">
+          <input
+            type="number"
+            min={0}
+            step={0.25}
+            value={l.durationH ?? ''}
+            placeholder={hours !== undefined ? `${fmtDuration(hours)} volgens de tijden` : 'Bijv. 13,75'}
+            onChange={(e) => set({ durationH: e.target.value ? Number(e.target.value) : undefined })}
+          />
+        </Field>
+        <Field label="Status">
+          <label className="check">
+            <input type="checkbox" checked={l.booked} onChange={(e) => set({ booked: e.target.checked })} /> Geboekt
+          </label>
+        </Field>
+        <BookingFields value={l.booking} onChange={(booking) => set({ booking })} />
+        <Field label="Notities" wide>
+          <textarea rows={2} value={l.notes ?? ''} placeholder="Overstap, stoelnummers, ophaallocatie…" onChange={(e) => set({ notes: e.target.value || undefined })} />
         </Field>
       </form>
     </Modal>

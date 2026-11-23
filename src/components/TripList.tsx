@@ -7,7 +7,7 @@ import { CurrencyFields } from './CurrencyFields'
 import { addDays } from '../lib/dates'
 
 export function TripList() {
-  const { trips, select, createTrip, addTrip, deleteTrip, localTrips, importLocal, mode } = useStore()
+  const { trips, select, createTrip, addTrip, deleteTrip, localTrips, importLocal, mode, access } = useStore()
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [money, setMoney] = useState({ homeCurrency: 'EUR', localCurrency: 'EUR', rate: 1 })
@@ -45,9 +45,11 @@ export function TripList() {
           {trips.map((t) => {
             const nights = daysBetween(t.startDate, t.endDate)
             const until = daysBetween(todayIso(), t.startDate)
+            const guest = access[t.id] && !access[t.id].owner
             return (
               <article key={t.id} className="trip-card" onClick={() => select(t.id)}>
                 <h3>{t.name}</h3>
+                {guest && <span className="badge soft shared-badge">👥 van {access[t.id].ownerEmail ?? 'een medereiziger'}</span>}
                 <p>
                   {fmtDay(t.startDate)} – {fmtDay(t.endDate)} · {nights + 1} dagen
                 </p>
@@ -61,10 +63,14 @@ export function TripList() {
                   </small>
                   <button
                     className="icon-btn"
-                    aria-label="Reis verwijderen"
+                    aria-label={guest ? 'Reis verlaten' : 'Reis verwijderen'}
+                    title={guest ? 'Reis verlaten' : 'Reis verwijderen'}
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (confirm(`“${t.name}” definitief verwijderen?`)) deleteTrip(t.id)
+                      const q = guest
+                        ? `“${t.name}” verlaten? Je ziet de reis daarna niet meer.`
+                        : `“${t.name}” definitief verwijderen?`
+                      if (confirm(q)) deleteTrip(t.id)
                     }}
                   >
                     🗑

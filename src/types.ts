@@ -1,6 +1,28 @@
 /** ISO 4217-valutacode, bijv. 'EUR' of 'JPY'. */
 export type Currency = string
 
+/** Bijlage (ticket, bevestiging) bij een boeking. */
+export interface Attachment {
+  id: string
+  name: string
+  type: string
+  size: number
+  /** Pad in Supabase Storage (cloud) of sleutel in IndexedDB (lokaal). */
+  path: string
+  where: 'cloud' | 'local'
+}
+
+/** Boekingsgegevens, gedeeld door verblijven, vervoer en activiteiten. */
+export interface Booking {
+  /** Bevestigingsnummer of reserveringscode. */
+  ref?: string
+  /** Link naar de boeking of het ticket. */
+  url?: string
+  /** Uiterste datum om te boeken of kosteloos te annuleren. */
+  deadline?: string
+  files?: Attachment[]
+}
+
 export interface Place {
   name: string
   lat?: number
@@ -24,8 +46,43 @@ export interface Stop {
   stayCost?: number
   stayCurrency: Currency
   booked: boolean
+  booking?: Booking
   notes?: string
   color: string
+}
+
+export const TRANSPORT_MODES = ['Vlucht', 'Trein', 'Bus', 'Auto', 'Boot', 'Anders'] as const
+export type TransportMode = (typeof TRANSPORT_MODES)[number]
+export const MODE_ICON: Record<TransportMode, string> = {
+  Vlucht: '✈️',
+  Trein: '🚄',
+  Bus: '🚌',
+  Auto: '🚗',
+  Boot: '⛴️',
+  Anders: '🧭',
+}
+
+/**
+ * Vervoer naar een stop. Het vertrekpunt volgt uit de route: de vorige stop,
+ * of thuis voor de eerste stop. `toId: 'home'` is de terugreis.
+ */
+export interface Leg {
+  id: string
+  toId: string
+  mode: TransportMode
+  date: string
+  depart?: string
+  arrive?: string
+  /** Reisduur in uren; nodig als vertrek en aankomst in een andere tijdzone liggen. */
+  durationH?: number
+  /** Bijv. 'KLM KL861' of 'Shinkansen Nozomi 23'. */
+  carrier?: string
+  /** Totale kosten voor alle reizigers. */
+  cost?: number
+  currency: Currency
+  booked: boolean
+  booking?: Booking
+  notes?: string
 }
 
 export interface Activity {
@@ -41,6 +98,9 @@ export interface Activity {
   /** Gezet als deze activiteit uit een idee is ontstaan. */
   ideaId?: string
   order: number
+  /** undefined = niet nodig om te reserveren. */
+  reserve?: 'todo' | 'booked'
+  booking?: Booking
 }
 
 export const IDEA_CATEGORIES = [
@@ -112,6 +172,7 @@ export interface Trip {
   /** Budget in thuisvaluta. */
   budget?: number
   stops: Stop[]
+  legs: Leg[]
   activities: Activity[]
   ideas: Idea[]
   expenses: Expense[]

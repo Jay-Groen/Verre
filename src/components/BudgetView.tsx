@@ -4,6 +4,8 @@ import { EXPENSE_CATEGORIES } from '../types'
 import { useStore } from '../store'
 import { fmtHome, fmtMoney, sortStops, toHome, tripCurrencies, uid } from '../lib/plan'
 import { MoneyInput } from './ui'
+import { legSlots } from '../lib/legs'
+import { MODE_ICON } from '../types'
 import { currencySymbol } from '../lib/currency'
 
 interface Line {
@@ -12,7 +14,7 @@ interface Line {
   amount: number
   currency: Currency
   category: ExpenseCategory
-  source: 'expense' | 'stay' | 'activity'
+  source: 'expense' | 'stay' | 'activity' | 'leg'
   paid?: boolean
 }
 
@@ -28,6 +30,9 @@ export function BudgetView({ trip }: { trip: Trip }) {
     ...sortStops(trip.stops)
       .filter((s) => s.stayCost)
       .map((s) => ({ key: s.id, title: `${s.stayName ?? 'Verblijf'} (${s.city})`, amount: s.stayCost!, currency: s.stayCurrency, category: 'Verblijf' as const, source: 'stay' as const, paid: s.booked })),
+    ...legSlots(trip)
+      .filter((x) => x.leg?.cost)
+      .map((x) => ({ key: x.leg!.id, title: `${MODE_ICON[x.leg!.mode]} ${x.fromName} → ${x.toName}`, amount: x.leg!.cost!, currency: x.leg!.currency, category: 'Vervoer' as const, source: 'leg' as const, paid: x.leg!.booked })),
     ...trip.activities
       .filter((a) => a.cost)
       .map((a) => ({ key: a.id, title: a.title, amount: a.cost! * trip.travelers, currency: a.currency, category: 'Activiteiten' as const, source: 'activity' as const })),
@@ -108,7 +113,7 @@ export function BudgetView({ trip }: { trip: Trip }) {
             setDraft(blank(draft.category))
           }}
         >
-          <input placeholder="Omschrijving, bijv. trein Lissabon → Porto" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          <input placeholder="Omschrijving, bijv. reisverzekering" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
           <MoneyInput amount={draft.amount || undefined} currency={draft.currency} currencies={tripCurrencies(trip)} onChange={(amount, currency) => setDraft({ ...draft, amount: amount ?? 0, currency })} />
           <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as ExpenseCategory })}>
             {EXPENSE_CATEGORIES.map((c) => (
@@ -133,7 +138,7 @@ export function BudgetView({ trip }: { trip: Trip }) {
               <tr key={l.source + l.key}>
                 <td>
                   {l.title}
-                  {l.source !== 'expense' && <small className="muted"> · {l.source === 'stay' ? 'uit route' : `uit planning, × ${trip.travelers}`}</small>}
+                  {l.source !== 'expense' && <small className="muted"> · {l.source === 'activity' ? `uit planning, × ${trip.travelers}` : 'uit route'}</small>}
                 </td>
                 <td>{l.category}</td>
                 <td className="num">{fmtMoney(l.amount, l.currency)}</td>
@@ -150,7 +155,7 @@ export function BudgetView({ trip }: { trip: Trip }) {
                         })
                       }
                     />
-                  ) : l.source === 'stay' ? (
+                  ) : l.source === 'stay' || l.source === 'leg' ? (
                     <small className="muted">{l.paid ? 'geboekt' : '—'}</small>
                   ) : null}
                 </td>

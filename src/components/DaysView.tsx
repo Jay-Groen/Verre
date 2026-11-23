@@ -5,6 +5,10 @@ import { buildDays, fitIdea, fmtHome, fmtHours, fmtMoney, norm, toHome, type Day
 import { fmtLong } from '../lib/dates'
 import { moveActivity, newActivity, planIdea } from '../lib/actions'
 import { ActivityForm } from './forms'
+import { MODE_ICON } from '../types'
+import { fmtDuration, fromMin, legSlots } from '../lib/legs'
+import { scheduleDay, sortDayByTime } from '../lib/schedule'
+import { removeBookingFiles } from '../lib/files'
 import { Empty } from './ui'
 
 const DRAG_ACT = 'application/x-activity'
@@ -13,6 +17,12 @@ const DRAG_IDEA = 'application/x-idea'
 export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => void }) {
   const update = useStore((s) => s.update)
   const days = useMemo(() => buildDays(trip), [trip])
+  const slots = useMemo(() => legSlots(trip), [trip])
+  const legName = (id: string) => {
+    const x = slots.find((y) => y.leg?.id === id)
+    return x ? `${x.fromName} → ${x.toName}` : ''
+  }
+  const outbound = slots[0]?.leg
   const [editing, setEditing] = useState<{ act: Activity; isNew: boolean } | null>(null)
   const [openIdeas, setOpenIdeas] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
@@ -45,7 +55,10 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
         </div>
       )}
       {days.map((d) => {
-        const over = d.loadH > d.capacityH
+        const plan = scheduleDay(d)
+        const busyH = d.loadH + plan.moveMin / 60
+        const over = busyH > d.capacityH
+        const travelLeg = d.legs[0]
         const suggestions = openIdeasFor(d)
         const dayCost = d.activities.reduce(
           (n, a) => n + (a.cost ? toHome(a.cost, a.currency, trip) : 0),
@@ -76,51 +89,100 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
                   {d.stop && <span className="chip city">{d.stop.city}</span>}
                   {d.travelFrom && (
                     <span className="chip travel">
-                      🚄 {d.travelFrom.city} → {d.stop?.city}
+                      {travelLeg ? MODE_ICON[travelLeg.mode] : '🧳'} {d.travelFrom.city} → {d.stop?.city}
                     </span>
                   )}
-                  {d.goingHome && <span className="chip travel">✈️ Terugreis</span>}
-                  {d.index === 0 && <span className="chip travel">✈️ Aankomst</span>}
+                  {d.goingHome && <span className="chip travel">{travelLeg ? MODE_ICON[travelLeg.mode] : '🏠'} Terugreis</span>}
+                  {d.index === 0 && (
+                    <span className="chip travel">
+                      {outbound ? MODE_ICON[outbound.mode] : '✈️'} Aankomst{outbound?.arrive ? ` ${outbound.arrive}` : ''}
+                    </span>
+                  )}
                   {!d.stop && !d.goingHome && <span className="chip warn">Geen verblijf gepland</span>}
                 </div>
               </div>
               <div className={'load' + (over ? ' over' : '')} title="Geplande uren t.o.v. wat haalbaar is">
                 <div className="bar">
-                  <span style={{ width: `${Math.min(100, (d.loadH / d.capacityH) * 100)}%` }} />
+                  <span style={{ width: `${Math.min(100, (busyH / d.capacityH) * 100)}%` }} />
                 </div>
-                <small>
-                  {fmtHours(d.loadH)} / {fmtHours(d.capacityH)}
+                <small title={plan.moveMin ? `waarvan ${fmtDuration(plan.moveMin / 60)} onderweg` : undefined}>
+                  {fmtHours(busyH)} / {fmtHours(d.capacityH)}
                   {over && ' · te vol'}
                 </small>
               </div>
             </header>
 
             <ol className="acts">
-              {d.activities.map((a) => (
-                <li
-                  key={a.id}
-                  className="act"
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(DRAG_ACT, a.id)
-                    e.dataTransfer.effectAllowed = 'move'
-                  }}
-                  onDrop={(e) => onDrop(e, d.date, a.id)}
-                  onClick={() => setEditing({ act: a, isNew: false })}
-                >
-                  <span className="grip" aria-hidden>⋮⋮</span>
-                  <span className="time">{a.time ?? '—'}</span>
-                  <span className="act-title">
-                    {a.title}
-                    {a.ideaId && <span className="tag">idee</span>}
-                    {a.place?.lat !== undefined && <span className="pin" title="Op de kaart">📍</span>}
-                  </span>
-                  <span className="meta">
-                    {fmtHours(a.durationH)}
-                    {a.cost ? ` · ${fmtMoney(a.cost, a.currency)}` : ''}
-                  </span>
-                </li>
-              ))}
+              {d.legs
+                .filter((l) => !l.depart)
+                .map((l) => (
+                  <li key={l.id} className="act leg-row">
+                    <span className="grip" />
+                    <span className="time">—</span>
+                    <span className="act-title">
+                      {MODE_ICON[l.mode]} {legName(l.id)}
+                      {l.carrier && <small className="muted"> · {l.carrier}</small>}
+                    </span>
+                    <span className="meta">{l.booked ? 'geboekt' : 'nog boeken'}</span>
+                  </li>
+                ))}
+              {plan.entries.map((e, i) => {
+                if (e.kind === 'move')
+                  return (
+                    <li key={'m' + i} className="move" aria-label="Reistijd">
+                      {e.mode === 'walk' ? '🚶' : '🚇'} ±{fmtDuration(e.minutes / 60)} ·{' '}
+                      {e.km < 10 ? e.km.toFixed(1).replace('.', ',') : Math.round(e.km)} km
+                    </li>
+                  )
+                if (e.kind === 'leg')
+                  return (
+                    <li key={e.leg.id} className="act leg-row">
+                      <span className="grip" />
+                      <span className="time">
+                        {fromMin(e.start)}
+                        <small>{fromMin(e.end)}</small>
+                      </span>
+                      <span className="act-title">
+                        {MODE_ICON[e.leg.mode]} {legName(e.leg.id)}
+                        {e.leg.carrier && <small className="muted"> · {e.leg.carrier}</small>}
+                      </span>
+                      <span className="meta">{e.leg.booked ? 'geboekt' : 'nog boeken'}</span>
+                    </li>
+                  )
+                const a = e.act
+                return (
+                  <li
+                    key={a.id}
+                    className={'act' + (e.conflict ? ' conflict' : '')}
+                    draggable
+                    onDragStart={(ev) => {
+                      ev.dataTransfer.setData(DRAG_ACT, a.id)
+                      ev.dataTransfer.effectAllowed = 'move'
+                    }}
+                    onDrop={(ev) => onDrop(ev, d.date, a.id)}
+                    onClick={() => setEditing({ act: a, isNew: false })}
+                  >
+                    <span className="grip" aria-hidden>⋮⋮</span>
+                    <span className={'time' + (e.fixed ? '' : ' est')} title={e.fixed ? undefined : 'Geschatte tijd'}>
+                      {e.fixed ? '' : '~'}
+                      {fromMin(e.start)}
+                      <small>{fromMin(e.end)}</small>
+                    </span>
+                    <span className="act-title">
+                      {a.title}
+                      {a.ideaId && <span className="tag">idee</span>}
+                      {a.reserve === 'todo' && <span className="tag todo">reserveren</span>}
+                      {a.reserve === 'booked' && <span className="tag ok">🎟️ geboekt</span>}
+                      {a.place?.lat !== undefined && <span className="pin" title="Op de kaart">📍</span>}
+                      {e.conflict && <small className="warn-text conflict-note">Te krap na het vorige onderdeel</small>}
+                    </span>
+                    <span className="meta">
+                      {fmtHours(a.durationH)}
+                      {a.cost ? ` · ${fmtMoney(a.cost, a.currency)}` : ''}
+                    </span>
+                  </li>
+                )
+              })}
               {d.activities.length === 0 && <li className="act-empty">Nog niets gepland — sleep hier een activiteit of idee heen.</li>}
             </ol>
 
@@ -136,7 +198,16 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
                   💡 {suggestions.length} {suggestions.length === 1 ? 'idee past' : 'ideeën passen'} in {d.stop?.city}
                 </button>
               )}
+              {plan.unsorted && (
+                <button className="btn small ghost" onClick={() => update((t) => sortDayByTime(t, d.date))}>
+                  ↕ Sorteer op tijd
+                </button>
+              )}
               <span className="spacer" />
+              {plan.moveMin > 0 && <small className="muted">±{fmtDuration(plan.moveMin / 60)} onderweg</small>}
+              {plan.end !== undefined && d.activities.length > 0 && (
+                <small className="muted">klaar ±{fromMin(plan.end)}</small>
+              )}
               {dayCost > 0 && <small className="muted">≈ {fmtHome(dayCost, trip)} p.p.</small>}
               {d.stop?.stayName && (
                 <small className="muted">
@@ -180,6 +251,7 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
             editing.isNew
               ? undefined
               : () => {
+                  removeBookingFiles(editing.act.booking)
                   update((t) => {
                     t.activities = t.activities.filter((x) => x.id !== editing.act.id)
                   })

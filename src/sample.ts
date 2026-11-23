@@ -1,4 +1,4 @@
-import type { Activity, Idea, PackItem, Stop, Trip } from './types'
+import type { Activity, Idea, Leg, PackItem, Stop, Trip } from './types'
 import { STOP_COLORS, uid } from './lib/plan'
 
 /** Algemene startlijst; per reis aan te vullen. */
@@ -58,6 +58,16 @@ export function sampleJapanTrip(): Trip {
     stop(4, 'Tokyo', '2027-04-14', '2027-04-15', 'Hotel bij Haneda', 35.5494, 139.7798, 18000, false),
   ]
 
+  const leg = (to: string, l: Omit<Leg, 'id' | 'toId'>): Leg => ({ id: uid(), toId: to, ...l })
+  const legs: Leg[] = [
+    leg(stops[0].id, { mode: 'Vlucht', date: '2027-03-31', depart: '14:40', arrive: '10:25', durationH: 12.75, carrier: 'KLM KL861', cost: 850, currency: 'EUR', booked: true, booking: { ref: 'XK7P2Q' } }),
+    leg(stops[1].id, { mode: 'Trein', date: '2027-04-06', depart: '10:10', arrive: '11:40', carrier: 'Odakyu Romancecar', cost: 4740, currency: 'JPY', booked: false }),
+    leg(stops[2].id, { mode: 'Trein', date: '2027-04-07', depart: '10:30', arrive: '13:10', carrier: 'Shinkansen Hikari (via Odawara)', currency: 'JPY', booked: true, notes: 'Met JR Pass' }),
+    leg(stops[3].id, { mode: 'Trein', date: '2027-04-11', depart: '11:00', arrive: '11:30', carrier: 'JR Special Rapid', currency: 'JPY', booked: true, notes: 'Met JR Pass' }),
+    leg(stops[4].id, { mode: 'Trein', date: '2027-04-14', depart: '12:00', arrive: '14:30', carrier: 'Shinkansen Nozomi', cost: 29000, currency: 'JPY', booked: false }),
+    leg('home', { mode: 'Vlucht', date: '2027-04-15', depart: '10:55', arrive: '17:40', durationH: 13.75, carrier: 'KLM KL862', cost: 850, currency: 'EUR', booked: true, booking: { ref: 'XK7P2Q' } }),
+  ]
+
   let order = 0
   const act = (
     date: string,
@@ -82,11 +92,12 @@ export function sampleJapanTrip(): Trip {
   const activities: Activity[] = [
     act('2027-04-01', 'Inchecken & ramen in Shinjuku', 35.6938, 139.7034, '17:00', 2),
     act('2027-04-02', 'Sensō-ji in Asakusa', 35.7148, 139.7967, '08:30', 2),
-    act('2027-04-02', 'Ueno-park (kersenbloesem)', 35.7156, 139.7745, '11:00', 2.5),
+    act('2027-04-02', 'Ueno-park (kersenbloesem)', 35.7156, 139.7745, undefined, 2.5),
+    act('2027-04-02', 'Lunch in Ameyoko', 35.7101, 139.7745, undefined, 1),
     act('2027-04-02', 'Shibuya Crossing & Sky', 35.6595, 139.7005, '17:30', 2, 2500),
-    act('2027-04-03', 'teamLab Planets', 35.6491, 139.7898, '10:00', 2, 3800),
+    { ...act('2027-04-03', 'teamLab Planets', 35.6491, 139.7898, '10:00', 2, 3800), reserve: 'todo', booking: { deadline: '2027-03-01' } },
     act('2027-04-04', 'Meiji-jingū & Harajuku', 35.6764, 139.6993, '09:30', 3),
-    act('2027-04-06', 'Hakone Loop: kabelbaan & piratenschip', 35.2443, 139.0234, '11:00', 4, 6100),
+    act('2027-04-06', 'Hakone Loop: kabelbaan & piratenschip', 35.2443, 139.0234, '12:30', 4, 6100),
     act('2027-04-08', 'Fushimi Inari (vroeg!)', 34.9671, 135.7727, '07:00', 3),
     act('2027-04-08', 'Kiyomizu-dera', 34.9949, 135.785, '11:00', 2, 500),
     act('2027-04-09', 'Arashiyama bamboebos', 35.017, 135.6713, '08:00', 3),
@@ -143,10 +154,10 @@ export function sampleJapanTrip(): Trip {
     rate: 165,
     budget: 6500,
     stops,
+    legs,
     activities,
     ideas,
     expenses: [
-      { id: uid(), title: 'Vliegtickets (2 p.)', amount: 1700, currency: 'EUR', category: 'Vervoer', paid: true },
       { id: uid(), title: 'JR Pass 7 dagen (2 p.)', amount: 100000, currency: 'JPY', category: 'Vervoer', paid: false },
       { id: uid(), title: 'Reisverzekering', amount: 60, currency: 'EUR', category: 'Overig', paid: true },
       { id: uid(), title: 'eSIM 15 dagen', amount: 25, currency: 'EUR', category: 'Overig', paid: false },

@@ -7,9 +7,11 @@ import { TripList } from './components/TripList'
 import { DaysView } from './components/DaysView'
 import { IdeasView } from './components/IdeasView'
 import { RouteView } from './components/RouteView'
+import { BookingsView } from './components/BookingsView'
 import { MapView } from './components/MapView'
 import { BudgetView } from './components/BudgetView'
 import { PackingView } from './components/PackingView'
+import { ShareModal } from './components/ShareModal'
 import { daysBetween, fmtDay, todayIso } from './lib/dates'
 import type { Trip } from './types'
 
@@ -17,6 +19,7 @@ const TABS = [
   { id: 'days', label: 'Planning', icon: '🗓️' },
   { id: 'ideas', label: 'Ideeën', icon: '💡' },
   { id: 'route', label: 'Route & verblijven', icon: '🛏️' },
+  { id: 'bookings', label: 'Boekingen', icon: '🎟️' },
   { id: 'map', label: 'Kaart', icon: '🗺️' },
   { id: 'budget', label: 'Budget', icon: '💰' },
   { id: 'packing', label: 'Paklijst', icon: '🎒' },
@@ -61,8 +64,10 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }
 }
 
 function TopBar({ trip, themeButton }: { trip: Trip | null; themeButton: ReactNode }) {
-  const { select, save, mode, user, signOut, error } = useStore()
+  const { select, save, mode, user, signOut, error, access } = useStore()
+  const [sharing, setSharing] = useState(false)
   const until = trip ? daysBetween(todayIso(), trip.startDate) : 0
+  const shared = trip && access[trip.id] && !access[trip.id].owner
   return (
     <header className="topbar">
       <button className="brand" onClick={() => select(null)} title="Alle reizen">
@@ -90,6 +95,12 @@ function TopBar({ trip, themeButton }: { trip: Trip | null; themeButton: ReactNo
               ? 'Opslaan mislukt'
               : 'Opgeslagen'}
       </span>
+      {trip && mode === 'cloud' && (
+        <button className="bar-btn" onClick={() => setSharing(true)} title={shared ? 'Gedeeld met jou' : 'Reis delen'}>
+          👥 {shared ? 'Gedeeld' : 'Delen'}
+        </button>
+      )}
+      {sharing && trip && <ShareModal trip={trip} onClose={() => setSharing(false)} />}
       {user && (
         <button className="bar-btn" onClick={signOut} title={user.email}>
           Uitloggen
@@ -130,6 +141,7 @@ function TripShell({ trip }: { trip: Trip }) {
         {tab === 'days' && <DaysView trip={trip} onGoRoute={() => go('route')} />}
         {tab === 'ideas' && <IdeasView trip={trip} />}
         {tab === 'route' && <RouteView trip={trip} />}
+        {tab === 'bookings' && <BookingsView trip={trip} />}
         {tab === 'map' && <MapView trip={trip} />}
         {tab === 'budget' && <BudgetView trip={trip} />}
         {tab === 'packing' && <PackingView trip={trip} />}

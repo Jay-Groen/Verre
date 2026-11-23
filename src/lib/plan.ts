@@ -1,5 +1,6 @@
-import type { Activity, Currency, Idea, Stop, Trip } from '../types'
+import type { Activity, Currency, Idea, Leg, Stop, Trip } from '../types'
 import { dateRange } from './dates'
+import { legHours } from './legs'
 
 /** Uren die je op een gewone dag kunt vullen, en op een reisdag. */
 export const DAY_CAPACITY_H = 9
@@ -17,6 +18,8 @@ export interface DayInfo {
   /** Laatste dag: vertrek naar huis. */
   goingHome: boolean
   activities: Activity[]
+  /** Vervoer dat op deze dag vertrekt. */
+  legs: Leg[]
   loadH: number
   capacityH: number
 }
@@ -37,7 +40,14 @@ export function buildDays(trip: Trip): DayInfo[] {
     const goingHome = date === trip.endDate && !night
     const activities = sortActivities(trip.activities.filter((a) => a.date === date))
     const loadH = activities.reduce((n, a) => n + (a.durationH || 0), 0)
-    const capacityH = travelFrom || goingHome ? TRAVEL_DAY_CAPACITY_H : DAY_CAPACITY_H
+    const legs = trip.legs.filter((l) => l.date === date).sort((a, b) => (a.depart ?? '').localeCompare(b.depart ?? ''))
+    const known = legs.map(legHours)
+    const capacityH =
+      legs.length && known.every((h) => h !== undefined)
+        ? Math.max(1, DAY_CAPACITY_H - known.reduce((n, h) => n + h! + 0.5, 0))
+        : travelFrom || goingHome || legs.length
+          ? TRAVEL_DAY_CAPACITY_H
+          : DAY_CAPACITY_H
     return {
       date,
       index,
@@ -45,6 +55,7 @@ export function buildDays(trip: Trip): DayInfo[] {
       travelFrom,
       goingHome,
       activities,
+      legs,
       loadH,
       capacityH,
     }

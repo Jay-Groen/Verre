@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import type { Stop, Trip } from '../types'
+import type { Leg, Stop, Trip } from '../types'
+import { MODE_ICON } from '../types'
+import { fmtDuration, legHours, legSlots, needsLeg, newLeg, type LegSlot } from '../lib/legs'
+import { removeBookingFiles } from '../lib/files'
 import { useStore } from '../store'
 import { STOP_COLORS, fmtMoney, sortStops, uid } from '../lib/plan'
 import { addDays, dateRange, daysBetween, fmtDay, fmtShort } from '../lib/dates'
-import { StopForm } from './forms'
+import { LegForm, StopForm } from './forms'
 import { CurrencyFields } from './CurrencyFields'
 import { currencySymbol } from '../lib/currency'
 import { Empty, Field } from './ui'
@@ -11,7 +14,11 @@ import { Empty, Field } from './ui'
 export function RouteView({ trip }: { trip: Trip }) {
   const update = useStore((s) => s.update)
   const [editing, setEditing] = useState<{ stop: Stop; isNew: boolean } | null>(null)
+  const [editLeg, setEditLeg] = useState<{ slot: LegSlot; leg: Leg; isNew: boolean } | null>(null)
   const stops = sortStops(trip.stops)
+  const slots = legSlots(trip)
+  const openLeg = (slot: LegSlot) =>
+    setEditLeg(slot.leg ? { slot, leg: slot.leg, isNew: false } : { slot, leg: newLeg(trip, slot), isNew: true })
 
   // Nachten zonder verblijf of met dubbele boeking.
   const nights = dateRange(trip.startDate, addDays(trip.endDate, -1))
@@ -66,14 +73,12 @@ export function RouteView({ trip }: { trip: Trip }) {
         </Empty>
       ) : (
         <ol className="timeline">
-          {stops.map((s, i) => {
+          {stops.map((s) => {
             const n = daysBetween(s.start, s.end)
-            const prev = stops[i - 1]
+            const slot = slots.find((x) => x.toId === s.id)!
             return (
               <li key={s.id} style={{ '--stop': s.color } as React.CSSProperties}>
-                {prev && prev.end === s.start && (
-                  <div className="leg">🚄 {prev.city} → {s.city} · {fmtDay(s.start)}</div>
-                )}
+                <LegRow slot={slot} onOpen={() => openLeg(slot)} />
                 <button className="stop-card" onClick={() => setEditing({ stop: s, isNew: false })}>
                   <div className="stop-dot" />
                   <div className="stop-main">
@@ -96,12 +101,44 @@ export function RouteView({ trip }: { trip: Trip }) {
                       <small className="muted">Nog geen verblijf</small>
                     )}
                   </div>
-                  <span className={'badge ' + (s.booked ? 'ok' : 'todo')}>{s.booked ? 'Geboekt' : 'Te boeken'}</span>
+                  <span className={'badge ' + (s.booked ? 'ok' : 'todo')}>
+                    {s.booked ? 'Geboekt' : 'Te boeken'}
+                    {s.booking?.files?.length ? ' · 📎' : ''}
+                  </span>
                 </button>
               </li>
             )
           })}
+          <li>
+            <LegRow slot={slots[slots.length - 1]} onOpen={() => openLeg(slots[slots.length - 1])} />
+            <div className="home-end">🏠 Thuis</div>
+          </li>
         </ol>
+      )}
+
+      {editLeg && (
+        <LegForm
+          trip={trip}
+          slot={editLeg.slot}
+          initial={editLeg.leg}
+          onClose={() => setEditLeg(null)}
+          onDelete={
+            editLeg.isNew
+              ? undefined
+              : () => {
+                  removeBookingFiles(editLeg.leg.booking)
+                  update((t) => void (t.legs = t.legs.filter((x) => x.id !== editLeg.leg.id)))
+                  setEditLeg(null)
+                }
+          }
+          onSave={(l) => {
+            update((t) => {
+              t.legs = t.legs.filter((x) => x.id !== l.id && x.toId !== l.toId)
+              t.legs.push(l)
+            })
+            setEditLeg(null)
+          }}
+        />
       )}
 
       {editing && (
@@ -113,8 +150,12 @@ export function RouteView({ trip }: { trip: Trip }) {
             editing.isNew
               ? undefined
               : () => {
+                  removeBookingFiles(editing.stop.booking)
+                  const leg = trip.legs.find((l) => l.toId === editing.stop.id)
+                  removeBookingFiles(leg?.booking)
                   update((t) => {
                     t.stops = t.stops.filter((x) => x.id !== editing.stop.id)
+                    t.legs = t.legs.filter((l) => l.toId !== editing.stop.id)
                   })
                   setEditing(null)
                 }
@@ -129,6 +170,45 @@ export function RouteView({ trip }: { trip: Trip }) {
           }}
         />
       )}
+    </div>
+  )
+}
+
+function LegRow({ slot, onOpen }: { slot: LegSlot; onOpen: () => void }) {
+  const l = slot.leg
+  if (!l) {
+    if (!needsLeg(slot)) return <div className="leg" />
+    return (
+      <div className="leg">
+        <button className="leg-add" onClick={onOpen}>
+          + Vervoer {slot.fromName} → {slot.toName}
+        </button>
+      </div>
+    )
+  }
+  const h = legHours(l)
+  return (
+    <div className="leg">
+      <button className="leg-card" onClick={onOpen}>
+        <span className="leg-icon" aria-hidden>{MODE_ICON[l.mode]}</span>
+        <span className="leg-main">
+          <strong>
+            {slot.fromName} → {slot.toName}
+          </strong>
+          <small>
+            {fmtDay(l.date)}
+            {l.depart && ` · ${l.depart}`}
+            {l.arrive && ` – ${l.arrive}`}
+            {h !== undefined && ` (${fmtDuration(h)})`}
+            {l.carrier && ` · ${l.carrier}`}
+            {l.cost ? ` · ${fmtMoney(l.cost, l.currency)}` : ''}
+          </small>
+        </span>
+        <span className={'badge ' + (l.booked ? 'ok' : 'todo')}>
+          {l.booked ? 'Geboekt' : 'Te boeken'}
+          {l.booking?.files?.length ? ' · 📎' : ''}
+        </span>
+      </button>
     </div>
   )
 }

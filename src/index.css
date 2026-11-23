@@ -951,9 +951,136 @@ main {
 .leg {
   font-size: 0.82rem;
   color: var(--muted);
-  padding: 0.3rem 0 0.3rem 2.2rem;
+  padding: 0.35rem 0 0.35rem 1.4rem;
   border-left: 2px dashed var(--line);
-  margin-left: 0.95rem;
+  margin-left: 1.45rem;
+  min-height: 0.9rem;
+}
+.leg-add {
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.leg-add:hover {
+  border-color: var(--primary);
+  color: var(--indigo);
+}
+.leg-card {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  width: 100%;
+  max-width: 620px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--indigo) 6%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--indigo) 22%, var(--line));
+  border-radius: 10px;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+.leg-card:hover {
+  border-color: var(--primary);
+}
+.leg-icon {
+  font-size: 1.1rem;
+}
+.leg-main {
+  flex: 1;
+  display: grid;
+  min-width: 0;
+}
+.leg-main small {
+  color: var(--muted);
+}
+.home-end {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 0.3rem 0 0 0.85rem;
+}
+.seg.modes {
+  display: flex;
+  flex-wrap: wrap;
+  border-radius: 12px;
+}
+.time small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.time.est {
+  color: var(--muted);
+  font-weight: 500;
+}
+.move {
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 0 0 0 3.15rem;
+  padding: 0.15rem 0 0.15rem 1.2rem;
+  border-left: 2px dotted var(--line);
+}
+.act.leg-row {
+  cursor: default;
+  background: color-mix(in srgb, var(--indigo) 6%, transparent);
+}
+.act.conflict {
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+.conflict-note {
+  display: block;
+}
+.tag.todo {
+  background: color-mix(in srgb, var(--warn) 18%, var(--paper));
+  color: var(--warn);
+}
+.tag.ok {
+  background: color-mix(in srgb, var(--ok) 15%, var(--paper));
+  color: var(--ok);
+}
+.files {
+  list-style: none;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.files li {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.file-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--ink);
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+.file-open:hover {
+  border-color: var(--primary);
+}
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .stop-card {
   width: 100%;
@@ -987,6 +1114,154 @@ main {
 .stop-main small,
 .stop-stay small {
   color: var(--muted);
+}
+
+/* Share */
+.share {
+  display: grid;
+  gap: 1rem;
+}
+.share p {
+  margin: 0;
+}
+.members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.members li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  border-radius: 10px;
+  background: var(--soft);
+  overflow-wrap: anywhere;
+}
+.avatar {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary);
+}
+.avatar.owner {
+  background: var(--accent);
+}
+.share-add {
+  display: flex;
+  gap: 0.5rem;
+}
+.share-add input {
+  flex: 1;
+  min-width: 0;
+}
+.small-print {
+  font-size: 0.82rem;
+}
+.shared-badge {
+  justify-self: start;
+  width: fit-content;
+}
+
+/* Bookings */
+.bookings .bar.wide {
+  flex: 1;
+  min-width: 160px;
+  max-width: 320px;
+}
+.booking-group {
+  margin-bottom: 1.6rem;
+}
+.booking-group h2 {
+  margin-bottom: 0.6rem;
+}
+.booking-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.booking {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.booking.booked {
+  border-color: color-mix(in srgb, var(--ok) 30%, var(--line));
+}
+.booking-main {
+  width: 100%;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0.7rem 0.9rem;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
+.booking-icon {
+  font-size: 1.2rem;
+}
+.booking-text {
+  flex: 1;
+  min-width: 12rem;
+  display: grid;
+}
+.booking-text small {
+  color: var(--muted);
+}
+.badge.late {
+  background: color-mix(in srgb, var(--danger) 15%, var(--paper));
+  color: var(--danger);
+}
+.badge.soft {
+  background: var(--soft);
+  color: var(--muted);
+}
+.ref {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: var(--soft);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+}
+.booking-files {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  padding: 0 0.9rem 0.7rem 3rem;
+}
+.file-chip {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--indigo);
+  background: color-mix(in srgb, var(--indigo) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--indigo) 25%, var(--line));
+  border-radius: 8px;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  text-decoration: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-chip:hover {
+  border-color: var(--primary);
 }
 
 /* Map */
