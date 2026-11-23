@@ -31,4 +31,27 @@ export const fmtDay = (s: string) => dayFmt.format(toDate(s))
 export const fmtLong = (s: string) => longFmt.format(toDate(s))
 export const fmtShort = (s: string) => shortFmt.format(toDate(s))
 
-export const todayIso = () => iso(new Date(Date.now() - new Date().getTimezoneOffset() * 60_000))
+export const realToday = () => iso(new Date(Date.now() - new Date().getTimezoneOffset() * 60_000))
+
+/** Vandaag (YYYY-MM-DD). Voor testen te overschrijven met localStorage 'verre.today'. */
+export const todayIso = () => {
+  try {
+    const t = localStorage.getItem('verre.today')
+    if (t && /^\d{4}-\d{2}-\d{2}$/.test(t)) return t
+  } catch {
+    /* ignore */
+  }
+  return realToday()
+}
+
+/** Minuten sinds middernacht, lokale tijd (te overschrijven met 'verre.now', bijv. '10:30'). */
+export const nowMinutes = () => {
+  try {
+    const t = localStorage.getItem('verre.now')
+    if (t && /^\d{2}:\d{2}$/.test(t)) return Number(t.slice(0, 2)) * 60 + Number(t.slice(3))
+  } catch {
+    /* ignore */
+  }
+  const d = new Date()
+  return d.getHours() * 60 + d.getMinutes()
+}

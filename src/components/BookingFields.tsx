@@ -108,3 +108,23 @@ export function BookingFields({
     </>
   )
 }
+
+/** Compacte weergave van een boeking: code, bijlagen en link. */
+export function BookingChips({ booking }: { booking?: Booking }) {
+  if (!booking || (!booking.ref && !booking.files?.length && !booking.url)) return null
+  return (
+    <div className="booking-chips">
+      {booking.ref && <code className="ref">{booking.ref}</code>}
+      {booking.files?.map((f) => (
+        <button key={f.id} type="button" className="file-chip" onClick={() => openFile(f)} title={`${f.name} openen`}>
+          {fileIcon(f)} {f.name}
+        </button>
+      ))}
+      {booking.url && (
+        <a className="file-chip" href={booking.url} target="_blank" rel="noreferrer">
+          🔗 Boeking
+        </a>
+      )}
+    </div>
+  )
+}

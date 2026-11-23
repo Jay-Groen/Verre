@@ -1,6 +1,7 @@
 import type { Activity, Currency, Idea, Leg, Stop, Trip } from '../types'
 import { dateRange } from './dates'
 import { legHours } from './legs'
+import { openOn } from './hours'
 
 /** Uren die je op een gewone dag kunt vullen, en op een reisdag. */
 export const DAY_CAPACITY_H = 9
@@ -76,8 +77,10 @@ export function fitIdea(idea: Idea, trip: Trip, days: DayInfo[]): Fit {
   if (activity) return { kind: 'planned', activity }
   if (idea.dropped) return { kind: 'dropped' }
 
+  // Dagen waarop de plek dicht is, tellen niet mee.
   const withFree = (ds: DayInfo[]) =>
     ds
+      .filter((d) => openOn(idea.place?.hours, d.date) !== false)
       .map((d) => ({ date: d.date, freeH: d.capacityH - d.loadH }))
       .sort((a, b) => b.freeH - a.freeH || a.date.localeCompare(b.date))
 

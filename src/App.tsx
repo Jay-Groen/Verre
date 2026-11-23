@@ -12,10 +12,13 @@ import { MapView } from './components/MapView'
 import { BudgetView } from './components/BudgetView'
 import { PackingView } from './components/PackingView'
 import { ShareModal } from './components/ShareModal'
+import { TodayView, isOngoing } from './components/TodayView'
+import { ExportModal, PrintGuide } from './components/ExportModal'
 import { daysBetween, fmtDay, todayIso } from './lib/dates'
 import type { Trip } from './types'
 
 const TABS = [
+  { id: 'today', label: 'Vandaag', icon: '📍' },
   { id: 'days', label: 'Planning', icon: '🗓️' },
   { id: 'ideas', label: 'Ideeën', icon: '💡' },
   { id: 'route', label: 'Route & verblijven', icon: '🛏️' },
@@ -89,7 +92,9 @@ function TopBar({ trip, themeButton }: { trip: Trip | null; themeButton: ReactNo
       <span className={'save-state ' + save} title={error}>
         {mode === 'local'
           ? 'Lokaal opgeslagen'
-          : save === 'saving'
+          : save === 'offline'
+            ? '📴 Offline · wordt later opgeslagen'
+            : save === 'saving'
             ? 'Opslaan…'
             : save === 'error'
               ? 'Opslaan mislukt'
@@ -112,10 +117,16 @@ function TopBar({ trip, themeButton }: { trip: Trip | null; themeButton: ReactNo
 }
 
 function TripShell({ trip }: { trip: Trip }) {
+  const ongoing = isOngoing(trip)
+  const [exporting, setExporting] = useState(false)
+  const [printing, setPrinting] = useState(false)
+  const tabs = TABS.filter((t) => t.id !== 'today' || ongoing)
   const [tab, setTab] = useState<Tab>(() => {
+    // Tijdens de reis open je op vandaag.
+    if (ongoing) return 'today'
     try {
       const t = localStorage.getItem('reisplanner.tab') as Tab | null
-      return t && TABS.some((x) => x.id === t) ? t : 'days'
+      return t && t !== 'today' && TABS.some((x) => x.id === t) ? t : 'days'
     } catch {
       return 'days'
     }
@@ -131,13 +142,20 @@ function TripShell({ trip }: { trip: Trip }) {
   return (
     <>
       <nav className="tabs">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => go(t.id)}>
             <span aria-hidden>{t.icon}</span> {t.label}
           </button>
         ))}
+        <span className="spacer" />
+        <button className="tab-export" onClick={() => setExporting(true)} title="Naar agenda of printen">
+          ⤓ Exporteren
+        </button>
       </nav>
+      {exporting && <ExportModal trip={trip} onClose={() => setExporting(false)} onPrint={() => setPrinting(true)} />}
+      {printing && <PrintGuide trip={trip} onClose={() => setPrinting(false)} />}
       <div className="view">
+        {tab === 'today' && <TodayView trip={trip} onOpenDays={() => go('days')} />}
         {tab === 'days' && <DaysView trip={trip} onGoRoute={() => go('route')} />}
         {tab === 'ideas' && <IdeasView trip={trip} />}
         {tab === 'route' && <RouteView trip={trip} />}

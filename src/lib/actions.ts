@@ -1,5 +1,6 @@
 import type { Activity, Idea, Leg, Stop, Trip } from '../types'
 import { sortActivities, uid } from './plan'
+import { addDays, daysBetween } from './dates'
 
 /** Zet een activiteit op een (andere) dag, optioneel vóór een andere activiteit. */
 export function moveActivity(trip: Trip, id: string, date: string, beforeId?: string) {
@@ -21,7 +22,7 @@ export function activityFromIdea(trip: Trip, idea: Idea, date: string): Activity
     id: uid(),
     date,
     title: idea.title,
-    place: idea.place,
+    place: idea.place && { ...idea.place },
     durationH: idea.durationH,
     cost: idea.cost,
     currency: idea.currency,
@@ -71,4 +72,43 @@ export function saveActivity(trip: Trip, a: Activity) {
     moveActivity(trip, a.id, a.date)
   } else if (old) Object.assign(old, a)
   else trip.activities.push(a)
+}
+
+/**
+ * Kopie van een reis als sjabloon: nieuwe id's, alle datums verschoven naar de nieuwe
+ * vertrekdatum, en boekingen, betalingen en afgevinkte paklijst weer op nul.
+ */
+export function duplicateTrip(src: Trip, name: string, startDate: string): Trip {
+  const shift = daysBetween(src.startDate, startDate)
+  const mv = (d: string) => addDays(d, shift)
+  const stopIds = new Map(src.stops.map((s) => [s.id, uid()]))
+  const ideaIds = new Map(src.ideas.map((i) => [i.id, uid()]))
+  return {
+    ...structuredClone(src),
+    id: uid(),
+    name,
+    startDate: mv(src.startDate),
+    endDate: mv(src.endDate),
+    stops: src.stops.map((s) => ({ ...s, id: stopIds.get(s.id)!, start: mv(s.start), end: mv(s.end), booked: false, booking: undefined })),
+    legs: src.legs.map((l) => ({
+      ...l,
+      id: uid(),
+      toId: stopIds.get(l.toId) ?? l.toId,
+      date: mv(l.date),
+      booked: false,
+      booking: undefined,
+    })),
+    ideas: src.ideas.map((i) => ({ ...i, id: ideaIds.get(i.id)!, votes: undefined })),
+    activities: src.activities.map((a) => ({
+      ...a,
+      id: uid(),
+      date: mv(a.date),
+      ideaId: a.ideaId && ideaIds.get(a.ideaId),
+      reserve: a.reserve ? 'todo' : undefined,
+      booking: undefined,
+    })),
+    expenses: src.expenses.map((e) => ({ ...e, id: uid(), paid: false })),
+    packing: src.packing.map((p) => ({ ...p, id: uid(), done: false })),
+    updatedAt: new Date().toISOString(),
+  }
 }

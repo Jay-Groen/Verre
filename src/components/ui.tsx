@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Currency, Place } from '../types'
 import { currencySymbol } from '../lib/currency'
+import { canNavigate, navUrl, type NavTarget } from '../lib/nav'
+import { parseHours } from '../lib/hours'
 
 export function Modal({
   title,
@@ -85,6 +87,7 @@ interface GeoResult {
   display_name: string
   lat: string
   lon: string
+  extratags?: { opening_hours?: string }
 }
 
 /** Plaatsnaam + zoeken via OpenStreetMap (Nominatim) zodat het op de kaart komt. */
@@ -109,13 +112,13 @@ export function PlaceInput({
     try {
       const q = [name, context].filter(Boolean).join(', ')
       const res = await fetch(
-        'https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=nl&q=' +
+        'https://nominatim.openstreetmap.org/search?format=json&limit=5&extratags=1&accept-language=nl&q=' +
           encodeURIComponent(q),
       )
       let data = (await res.json()) as GeoResult[]
       if (data.length === 0 && context) {
         const res2 = await fetch(
-          'https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=nl&q=' +
+          'https://nominatim.openstreetmap.org/search?format=json&limit=5&extratags=1&accept-language=nl&q=' +
             encodeURIComponent(name),
         )
         data = (await res2.json()) as GeoResult[]
@@ -135,7 +138,7 @@ export function PlaceInput({
           value={name}
           placeholder={placeholder}
           onChange={(e) =>
-            onChange(e.target.value ? { name: e.target.value } : undefined)
+            onChange(e.target.value ? { name: e.target.value, hours: value?.hours } : undefined)
           }
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -151,7 +154,7 @@ export function PlaceInput({
       {value?.lat !== undefined && (
         <small className="ok">
           📍 Op de kaart ({value.lat.toFixed(4)}, {value.lng?.toFixed(4)}){' '}
-          <button type="button" className="link" onClick={() => onChange({ name })}>
+          <button type="button" className="link" onClick={() => onChange({ name, hours: value?.hours })}>
             wissen
           </button>
         </small>
@@ -164,7 +167,7 @@ export function PlaceInput({
               <button
                 type="button"
                 onClick={() => {
-                  onChange({ name, lat: Number(r.lat), lng: Number(r.lon) })
+                  onChange({ name, lat: Number(r.lat), lng: Number(r.lon), hours: r.extratags?.opening_hours ?? value?.hours })
                   setResults(null)
                 }}
               >
@@ -194,5 +197,35 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
       <h3>{title}</h3>
       {children}
     </div>
+  )
+}
+
+/** Opent de kaarten-app met een route naar de plek. */
+export function NavLink({ to, label = 'Route', className = 'nav-link' }: { to?: NavTarget; label?: string; className?: string }) {
+  if (!canNavigate(to)) return null
+  return (
+    <a className={className} href={navUrl(to!)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+      🧭 {label}
+    </a>
+  )
+}
+
+/** Openingstijden bij een plek, met directe controle of we ze begrijpen. */
+export function HoursInput({ place, fallbackName, onChange }: { place?: Place; fallbackName: string; onChange: (p: Place) => void }) {
+  const text = place?.hours ?? ''
+  const ok = parseHours(text)
+  return (
+    <>
+      <input
+        value={text}
+        placeholder="Bijv. ma-vr 09:00-17:00; za 10:00-16:00; zo gesloten"
+        onChange={(e) => onChange({ ...(place ?? { name: fallbackName }), hours: e.target.value || undefined })}
+      />
+      {text && (
+        <small className={ok ? 'ok' : 'muted'}>
+          {ok ? '✓ Begrepen: je krijgt een seintje als het dicht is.' : 'Niet helemaal begrepen; dit wordt alleen als notitie bewaard.'}
+        </small>
+      )}
+    </>
   )
 }

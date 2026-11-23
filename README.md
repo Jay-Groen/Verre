@@ -11,6 +11,16 @@ Verre is een web-app om een reis overzichtelijk te plannen: verzamel ideeën, zi
 - **Kaart**: verblijven, activiteiten en open ideeën op een OpenStreetMap-kaart, voor de hele reis of per dag. Zonder plekken start de kaart op je huidige locatie.
 - **Budget**: kosten in de valuta van je bestemming én je eigen valuta (met actuele wisselkoers via frankfurter.dev), met verblijven en activiteiten automatisch meegeteld, per categorie en afgezet tegen je budget.
 - **Paklijst**: een afvinklijst met een algemene startlijst.
+- **Vandaag**: tijdens de reis opent Verre op vandaag: wat er nu en straks gepland staat, je verblijf van vannacht met route ernaartoe, je tickets en een vooruitblik op morgen.
+- **Navigeren**: met één tik een route naar een activiteit of verblijf in Google Maps of Apple Kaarten.
+- **Weer**: per dag de verwachting (tot ~15 dagen vooruit) of, verder weg, het weer van dezelfde periode in een eerder jaar (via Open-Meteo).
+- **Snel ideeën toevoegen**: plak een link van Google Maps, Apple Kaarten, OpenStreetMap, TripAdvisor of een blog; naam, plek en stad worden waar mogelijk automatisch ingevuld.
+- **Openingstijden**: bij een plek in te vullen (of automatisch uit OpenStreetMap); je krijgt een waarschuwing als je iets plant op een dag of tijd dat het dicht is, en ideeën stellen geen dichte dagen meer voor.
+- **Stemmen**: medereizigers geven ideeën een duim; sorteer op wat het populairst is.
+- **Kosten verdelen**: geef aan wie wat heeft betaald en over wie het verdeeld wordt; Verre rekent uit wie wie hoeveel moet terugbetalen.
+- **Exporteren**: alles naar je agenda (.ics), of een printbare reisgids (ook als PDF).
+- **Dupliceren**: kopieer een reis als sjabloon naar nieuwe datums.
+- **Offline**: na één bezoek opent de gebouwde app ook zonder internet; je reizen staan als kopie op je apparaat, wijzigingen worden opgeslagen zodra je weer online bent, en bijlagen kun je vooraf op je apparaat zetten.
 - **Delen**: nodig medereizigers uit met hun e-mailadres; zij zien en bewerken dezelfde reis, en wijzigingen komen live binnen.
 - **Licht en donker**: volgt de instelling van je browser, met een knop rechtsboven om te wisselen.
 

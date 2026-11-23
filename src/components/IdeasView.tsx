@@ -6,6 +6,35 @@ import { fmtDay } from '../lib/dates'
 import { newIdea, planIdea } from '../lib/actions'
 import { IdeaForm } from './forms'
 import { Empty } from './ui'
+import { peopleOf } from '../lib/split'
+import { cityAt, findPlace, parseLink } from '../lib/linkparse'
+
+/** Naam om te tonen: bij een e-mailadres alleen het deel vóór de @. */
+const voterName = (v: string) => (v.includes('@') ? v.split('@')[0] : v)
+
+/** Wie stemt er op dit apparaat: met account je e-mailadres, anders een gekozen reiziger. */
+function useMe(trip: Trip) {
+  const email = useStore((s) => s.user?.email?.toLowerCase())
+  const people = peopleOf(trip)
+  const key = `verre.me.${trip.id}`
+  const [picked, setPicked] = useState(() => {
+    try {
+      return localStorage.getItem(key) ?? undefined
+    } catch {
+      return undefined
+    }
+  })
+  const me = email ?? (picked && people.includes(picked) ? picked : people[0])
+  const pick = (p: string) => {
+    setPicked(p)
+    try {
+      localStorage.setItem(key, p)
+    } catch {
+      /* ignore */
+    }
+  }
+  return { me, pick, people, canPick: !email && people.length > 1 }
+}
 
 type Filter = 'all' | 'open' | 'planned'
 
@@ -23,6 +52,16 @@ export function IdeasView({ trip }: { trip: Trip }) {
   const days = useMemo(() => buildDays(trip), [trip])
   const [editing, setEditing] = useState<{ idea: Idea; isNew: boolean } | null>(null)
   const [filter, setFilter] = useState<Filter>('open')
+  const [byVotes, setByVotes] = useState(false)
+  const { me, pick, people, canPick } = useMe(trip)
+  const vote = (id: string) =>
+    update((t) => {
+      const i = t.ideas.find((x) => x.id === id)
+      if (!i) return
+      const v = i.votes ?? []
+      i.votes = v.includes(me) ? v.filter((x) => x !== me) : [...v, me]
+      if (!i.votes.length) i.votes = undefined
+    })
 
   const all = trip.ideas.map((idea) => ({ idea, fit: fitIdea(idea, trip, days) }))
   const counts = {
@@ -36,7 +75,12 @@ export function IdeasView({ trip }: { trip: Trip }) {
     .filter(({ fit }) =>
       filter === 'all' ? true : filter === 'planned' ? fit.kind === 'planned' : fit.kind !== 'planned' && fit.kind !== 'dropped',
     )
-    .sort((a, b) => a.idea.priority - b.idea.priority || a.idea.title.localeCompare(b.idea.title))
+    .sort(
+      (a, b) =>
+        (byVotes ? (b.idea.votes?.length ?? 0) - (a.idea.votes?.length ?? 0) : 0) ||
+        a.idea.priority - b.idea.priority ||
+        a.idea.title.localeCompare(b.idea.title),
+    )
 
   // Groepeer per stad in de volgorde van de route.
   const groups: Group[] = []
@@ -75,6 +119,23 @@ export function IdeasView({ trip }: { trip: Trip }) {
           <Stat n={counts.offroute} label="niet op route" tone="muted" />
         </div>
         <div className="row">
+          {canPick && (
+            <label className="me-pick">
+              <small className="muted">Ik ben</small>
+              <select value={me} onChange={(e) => pick(e.target.value)}>
+                {people.map((p) => (
+                  <option key={p}>{p}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button
+            className={'btn small ghost' + (byVotes ? ' on' : '')}
+            onClick={() => setByVotes(!byVotes)}
+            title="Sorteer op aantal stemmen"
+          >
+            👍 {byVotes ? 'Populairst eerst' : 'Sorteer op stemmen'}
+          </button>
           <div className="seg">
             {(['open', 'planned', 'all'] as Filter[]).map((f) => (
               <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
@@ -87,6 +148,11 @@ export function IdeasView({ trip }: { trip: Trip }) {
           </button>
         </div>
       </div>
+
+      <QuickAdd
+        trip={trip}
+        onReady={(idea) => setEditing({ idea, isNew: true })}
+      />
 
       {trip.ideas.length === 0 && (
         <Empty title="Nog geen ideeën">
@@ -115,6 +181,8 @@ export function IdeasView({ trip }: { trip: Trip }) {
                   fit={fit}
                   days={days}
                   onEdit={() => setEditing({ idea, isNew: false })}
+                  me={me}
+                  onVote={() => vote(idea.id)}
                   onPlan={(date) => plan(idea.id, date)}
                   onUnplan={() =>
                     update((t) => {
@@ -182,10 +250,14 @@ function IdeaCard({
   onPlan,
   onUnplan,
   onDrop,
+  me,
+  onVote,
 }: {
   idea: Idea
   fit: Fit
   days: DayInfo[]
+  me: string
+  onVote: () => void
   onEdit: () => void
   onPlan: (date: string) => void
   onUnplan: () => void
@@ -197,8 +269,25 @@ function IdeaCard({
       <div className="idea-head">
         <span className="stars" title="Prioriteit">{'★'.repeat(4 - idea.priority)}</span>
         <h4 onClick={onEdit}>{idea.title}</h4>
+        <button
+          className={'vote' + (idea.votes?.includes(me) ? ' on' : '')}
+          onClick={onVote}
+          aria-pressed={!!idea.votes?.includes(me)}
+          title={idea.votes?.length ? `Leuk volgens ${idea.votes.map(voterName).join(', ')}` : 'Vind ik leuk'}
+        >
+          👍 {idea.votes?.length ?? ''}
+        </button>
         <button className="icon-btn" onClick={onEdit} aria-label="Bewerken">✎</button>
       </div>
+      {idea.votes?.length ? (
+        <div className="voters" aria-label="Stemmen">
+          {idea.votes.map((v) => (
+            <span key={v} className="avatar mini" title={voterName(v)}>
+              {voterName(v).charAt(0).toUpperCase()}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="idea-meta">
         <span>{idea.category}</span>
         <span>{fmtHours(idea.durationH)}</span>
@@ -291,5 +380,64 @@ function DayPicker({
         </option>
       ))}
     </select>
+  )
+}
+
+/** Plak een link (Google Maps, blog, …) of typ een idee; opent het formulier vooraf ingevuld. */
+function QuickAdd({ trip, onReady }: { trip: Trip; onReady: (i: Idea) => void }) {
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string>()
+  const routeCities = [...new Set(trip.stops.map((s) => s.city))]
+
+  const submit = async () => {
+    const value = text.trim()
+    if (!value) return
+    const idea = newIdea(trip)
+    const info = parseLink(value)
+    setNote(undefined)
+    if (!info) {
+      onReady({ ...idea, title: value })
+      setText('')
+      return
+    }
+    setBusy(true)
+    idea.link = info.url
+    idea.title = info.title ?? ''
+    let pos = info.lat !== undefined ? { lat: info.lat, lng: info.lng! } : undefined
+    // Een plaatsnaam uit een kaartlink kunnen we opzoeken; een blogtitel niet.
+    if (!pos && info.title && /Google Maps|Apple Kaarten/.test(info.site ?? '')) pos = await findPlace(info.title)
+    if (pos) {
+      idea.place = { name: info.title ?? 'Locatie uit link', ...pos }
+      const city = await cityAt(pos.lat, pos.lng)
+      if (city) idea.city = routeCities.find((c) => norm(c) === norm(city)) ?? city
+    }
+    if (/Google Maps|Apple Kaarten|OpenStreetMap/.test(info.site ?? '') && !info.title) idea.title = ''
+    setBusy(false)
+    setText('')
+    if (info.short)
+      setNote('Korte deellinks (maps.app.goo.gl) kunnen we niet uitlezen. Open de link en kopieer het volledige adres uit de adresbalk, dan komt de plek op de kaart.')
+    onReady(idea)
+  }
+
+  return (
+    <form
+      className="quick-add"
+      onSubmit={(e) => {
+        e.preventDefault()
+        submit()
+      }}
+    >
+      <input
+        value={text}
+        placeholder="Plak een link (Google Maps, blog, TripAdvisor…) of typ een idee"
+        onChange={(e) => setText(e.target.value)}
+        aria-label="Snel een idee toevoegen"
+      />
+      <button className="btn" disabled={busy || !text.trim()}>
+        {busy ? 'Ophalen…' : 'Toevoegen'}
+      </button>
+      {note && <small className="muted quick-note">{note}</small>}
+    </form>
   )
 }

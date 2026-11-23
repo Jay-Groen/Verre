@@ -5,6 +5,8 @@ import { daysBetween, fmtDay, todayIso } from '../lib/dates'
 import { Field, Modal } from './ui'
 import { CurrencyFields } from './CurrencyFields'
 import { addDays } from '../lib/dates'
+import { duplicateTrip } from '../lib/actions'
+import type { Trip } from '../types'
 
 export function TripList() {
   const { trips, select, createTrip, addTrip, deleteTrip, localTrips, importLocal, mode, access } = useStore()
@@ -13,6 +15,7 @@ export function TripList() {
   const [money, setMoney] = useState({ homeCurrency: 'EUR', localCurrency: 'EUR', rate: 1 })
   const [start, setStart] = useState(addDays(todayIso(), 90))
   const [end, setEnd] = useState(addDays(todayIso(), 103))
+  const [copying, setCopying] = useState<{ trip: Trip; name: string; start: string } | null>(null)
 
   return (
     <div className="trip-list">
@@ -63,6 +66,17 @@ export function TripList() {
                   </small>
                   <button
                     className="icon-btn"
+                    aria-label="Reis dupliceren"
+                    title="Dupliceren als nieuwe reis"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCopying({ trip: t, name: `${t.name} (kopie)`, start: t.startDate })
+                    }}
+                  >
+                    ⧉
+                  </button>
+                  <button
+                    className="icon-btn"
                     aria-label={guest ? 'Reis verlaten' : 'Reis verwijderen'}
                     title={guest ? 'Reis verlaten' : 'Reis verwijderen'}
                     onClick={(e) => {
@@ -80,6 +94,50 @@ export function TripList() {
             )
           })}
         </div>
+      )}
+
+      {copying && (
+        <Modal
+          title="Reis dupliceren"
+          onClose={() => setCopying(null)}
+          footer={
+            <>
+              <span className="spacer" />
+              <button className="btn ghost" onClick={() => setCopying(null)}>Annuleren</button>
+              <button type="submit" form="copy-trip" className="btn primary" disabled={!copying.name.trim() || !copying.start}>
+                Dupliceren
+              </button>
+            </>
+          }
+        >
+          <form
+            id="copy-trip"
+            className="form-grid"
+            onSubmit={(e) => {
+              e.preventDefault()
+              addTrip(duplicateTrip(copying.trip, copying.name.trim(), copying.start))
+              setCopying(null)
+            }}
+          >
+            <Field label="Naam" wide>
+              <input autoFocus value={copying.name} onChange={(e) => setCopying({ ...copying, name: e.target.value })} />
+            </Field>
+            <Field label="Nieuwe vertrekdatum">
+              <input type="date" value={copying.start} onChange={(e) => setCopying({ ...copying, start: e.target.value })} />
+            </Field>
+            <Field label="Terug">
+              <input
+                type="date"
+                disabled
+                value={copying.start ? addDays(copying.start, daysBetween(copying.trip.startDate, copying.trip.endDate)) : ''}
+              />
+            </Field>
+            <p className="muted wide-note">
+              Route, vervoer, planning, ideeën, budget en paklijst gaan mee en schuiven mee naar de nieuwe datums.
+              Boekingen, bijlagen en wat al betaald of ingepakt was, beginnen opnieuw.
+            </p>
+          </form>
+        </Modal>
       )}
 
       {creating && (

@@ -66,3 +66,45 @@ export async function deleteRemote(id: string) {
   const { error } = await supabase.from('trips').delete().eq('id', id)
   if (error) throw error
 }
+
+// ---- Offline kopie van je account-reizen ----
+
+interface Cache {
+  trips: Trip[]
+  access: Record<string, Access>
+  /** Reizen met wijzigingen die nog niet naar Supabase zijn gestuurd. */
+  pending: string[]
+}
+
+const cacheKey = (userId: string) => `verre.cache.${userId}`
+
+export function loadCache(userId: string): Cache | null {
+  try {
+    const raw = localStorage.getItem(cacheKey(userId))
+    if (!raw) return null
+    const c = JSON.parse(raw) as Cache
+    return { ...c, trips: c.trips.map(normalizeTrip), pending: c.pending ?? [] }
+  } catch {
+    return null
+  }
+}
+
+export function saveCache(userId: string, c: Cache) {
+  try {
+    localStorage.setItem(cacheKey(userId), JSON.stringify(c))
+  } catch {
+    /* opslag vol */
+  }
+}
+
+export function clearCache(userId: string) {
+  try {
+    localStorage.removeItem(cacheKey(userId))
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Lijkt deze fout op 'geen internet' (in plaats van bijv. geen rechten)? */
+export const isNetworkError = (e: unknown) =>
+  !navigator.onLine || e instanceof TypeError || /fetch|network|Failed to fetch|Load failed/i.test(String((e as Error)?.message ?? e))

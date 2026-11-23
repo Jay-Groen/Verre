@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Activity, Booking, Leg, Stop, Trip } from '../types'
 import { MODE_ICON } from '../types'
 import { useStore } from '../store'
@@ -6,7 +6,7 @@ import { fmtMoney, sortStops } from '../lib/plan'
 import { daysBetween, fmtDay, todayIso } from '../lib/dates'
 import { legSlots, needsLeg, newLeg, type LegSlot } from '../lib/legs'
 import { deleteStop, saveActivity, saveLeg, saveStop } from '../lib/actions'
-import { openFile, removeBookingFiles } from '../lib/files'
+import { allFiles, makeOffline, offlineStatus, openFile, removeBookingFiles } from '../lib/files'
 import { ActivityForm, LegForm, StopForm } from './forms'
 import { Empty } from './ui'
 
@@ -121,6 +121,7 @@ export function BookingsView({ trip }: { trip: Trip }) {
           <span style={{ width: `${(done.length / items.length) * 100}%` }} />
         </div>
       </div>
+      <OfflineFiles trip={trip} />
 
       {todo.length > 0 && (
         <section className="booking-group">
@@ -241,5 +242,52 @@ function BookingRow({ item: i, today }: { item: Item; today: string }) {
         </div>
       )}
     </li>
+  )
+}
+
+/** Zet alle bijlagen uit je account op dit apparaat, zodat je ze onderweg zonder internet kunt openen. */
+function OfflineFiles({ trip }: { trip: Trip }) {
+  const files = allFiles(trip)
+  const key = files.map((f) => f.id).join()
+  const [state, setState] = useState<{ total: number; have: number } | null>(null)
+  const [busy, setBusy] = useState<number | null>(null)
+  const [error, setError] = useState<string>()
+  useEffect(() => {
+    offlineStatus(files).then(setState)
+    // files is afgeleid van key
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!state || state.total === 0) return null
+  const all = state.have >= state.total
+  return (
+    <div className={'notice offline-files' + (all ? ' done' : '')}>
+      {all ? (
+        <span>📴 Alle {state.total} bijlagen staan op dit apparaat en werken ook zonder internet.</span>
+      ) : (
+        <>
+          <span>
+            📴 {state.have} van {state.total} bijlagen staan op dit apparaat. Download ze vóór vertrek, dan heb je je tickets
+            ook zonder internet.
+          </span>
+          <button
+            className="btn small primary"
+            disabled={busy !== null}
+            onClick={async () => {
+              setBusy(0)
+              setError(undefined)
+              try {
+                await makeOffline(files, setBusy)
+              } catch (e) {
+                setError((e as Error).message)
+              }
+              setBusy(null)
+              setState(await offlineStatus(files))
+            }}
+          >
+            {busy !== null ? `Bezig… ${busy}/${state.total}` : 'Bewaar op dit apparaat'}
+          </button>
+        </>
+      )}
+      {error && <small className="warn-text">{error}</small>}
+    </div>
   )
 }

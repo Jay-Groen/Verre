@@ -2,8 +2,9 @@ import { useState } from 'react'
 import type { Activity, Idea, Leg, Stop, Trip } from '../types'
 import { IDEA_CATEGORIES, MODE_ICON, TRANSPORT_MODES } from '../types'
 import { BookingFields, cleanupRemoved, tidyBooking } from './BookingFields'
-import { fmtDuration, legHours, type LegSlot } from '../lib/legs'
-import { Field, Modal, MoneyInput, PlaceInput } from './ui'
+import { fmtDuration, legHours, toMin as toMinutes, type LegSlot } from '../lib/legs'
+import { Field, HoursInput, Modal, MoneyInput, NavLink, PlaceInput } from './ui'
+import { checkHours } from '../lib/hours'
 import { buildDays, sortStops, tripCurrencies } from '../lib/plan'
 import { fmtDay } from '../lib/dates'
 
@@ -88,6 +89,15 @@ export function ActivityForm({
         </Field>
         <Field label="Locatie" wide>
           <PlaceInput value={a.place} context={city} onChange={(place) => set({ place })} />
+          <NavLink to={a.place && { ...a.place, near: city }} label="Route ernaartoe" />
+        </Field>
+        <Field label="Openingstijden" wide>
+          <HoursInput place={a.place} fallbackName={a.title} onChange={(place) => set({ place })} />
+          {(() => {
+            const h = toMinutes(a.time)
+            const c = checkHours(a.place?.hours, a.date, h, h !== undefined ? h + a.durationH * 60 : undefined)
+            return c && <small className="warn-text">⚠️ {c.message}{c.closed ? ' — kies een andere dag' : ''}</small>
+          })()}
         </Field>
         <Field label="Reserveren">
           <select
@@ -191,6 +201,9 @@ export function IdeaForm({
         <Field label="Locatie" wide>
           <PlaceInput value={i.place} context={i.city} onChange={(place) => set({ place })} />
         </Field>
+        <Field label="Openingstijden" wide>
+          <HoursInput place={i.place} fallbackName={i.title} onChange={(place) => set({ place })} />
+        </Field>
         <Field label="Notities" wide>
           <textarea rows={3} value={i.notes ?? ''} onChange={(e) => set({ notes: e.target.value || undefined })} />
         </Field>
@@ -251,6 +264,10 @@ export function StopForm({
         </Field>
         <Field label="Adres" wide>
           <input value={s.stayAddress ?? ''} onChange={(e) => set({ stayAddress: e.target.value || undefined })} />
+          <NavLink
+            to={s.lat !== undefined ? { lat: s.lat, lng: s.lng } : { name: s.stayAddress ?? s.stayName, near: s.city }}
+            label="Route ernaartoe"
+          />
         </Field>
         <Field label="Check-in">
           <input type="time" value={s.checkIn ?? ''} onChange={(e) => set({ checkIn: e.target.value || undefined })} />

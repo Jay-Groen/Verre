@@ -6,6 +6,7 @@ import type { Trip } from '../types'
 import { MODE_ICON } from '../types'
 import { buildDays, fitIdea, sortStops } from '../lib/plan'
 import { fmtDay } from '../lib/dates'
+import { NavLink } from './ui'
 
 /** Wereldkaart als niets bekend is. */
 const WORLD: LatLngTuple = [25, 10]
@@ -194,6 +195,8 @@ export function MapView({ trip }: { trip: Trip }) {
                 {s.stayName ?? 'Verblijf'}
                 <br />
                 {fmtDay(s.start)} – {fmtDay(s.end)}
+                <br />
+                <NavLink to={{ lat: s.lat, lng: s.lng }} label="Route hierheen" />
               </Popup>
             </CircleMarker>
           ))}
@@ -213,6 +216,8 @@ export function MapView({ trip }: { trip: Trip }) {
                 <br />
                 Dag {(days.find((d) => d.date === a.date)?.index ?? 0) + 1} · {fmtDay(a.date)}
                 {a.time ? ` · ${a.time}` : ''}
+                <br />
+                <NavLink to={a.place} label="Route hierheen" />
               </Popup>
             </CircleMarker>
           ))}
@@ -230,6 +235,8 @@ export function MapView({ trip }: { trip: Trip }) {
                 <strong>💡 {i.title}</strong>
                 <br />
                 {i.city ?? 'Geen stad'} · nog niet gepland
+                <br />
+                <NavLink to={i.place} label="Route hierheen" />
               </Popup>
             </CircleMarker>
           ))}

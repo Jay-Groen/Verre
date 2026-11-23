@@ -9,6 +9,8 @@ import { MODE_ICON } from '../types'
 import { fmtDuration, fromMin, legSlots } from '../lib/legs'
 import { scheduleDay, sortDayByTime } from '../lib/schedule'
 import { removeBookingFiles } from '../lib/files'
+import { useWeather, weatherIcon, weatherTitle } from '../lib/weather'
+import { checkHours } from '../lib/hours'
 import { Empty } from './ui'
 
 const DRAG_ACT = 'application/x-activity'
@@ -26,6 +28,7 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
   const [editing, setEditing] = useState<{ act: Activity; isNew: boolean } | null>(null)
   const [openIdeas, setOpenIdeas] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
+  const weather = useWeather(trip)
 
   if (days.length === 0)
     return <Empty title="Geen dagen">Stel eerst de begin- en einddatum van je reis in.</Empty>
@@ -87,6 +90,12 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
                 <h3>{fmtLong(d.date)}</h3>
                 <div className="chips">
                   {d.stop && <span className="chip city">{d.stop.city}</span>}
+                  {weather[d.date] && (
+                    <span className={'chip weather ' + weather[d.date].kind} title={weatherTitle(weather[d.date])}>
+                      {weatherIcon(weather[d.date].code)[0]} {Math.round(weather[d.date].tmax)}°
+                      <small>/{Math.round(weather[d.date].tmin)}°</small>
+                    </span>
+                  )}
                   {d.travelFrom && (
                     <span className="chip travel">
                       {travelLeg ? MODE_ICON[travelLeg.mode] : '🧳'} {d.travelFrom.city} → {d.stop?.city}
@@ -150,10 +159,11 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
                     </li>
                   )
                 const a = e.act
+                const hours = checkHours(a.place?.hours, d.date, e.start, e.end)
                 return (
                   <li
                     key={a.id}
-                    className={'act' + (e.conflict ? ' conflict' : '')}
+                    className={'act' + (e.conflict || hours?.closed ? ' conflict' : '')}
                     draggable
                     onDragStart={(ev) => {
                       ev.dataTransfer.setData(DRAG_ACT, a.id)
@@ -175,6 +185,12 @@ export function DaysView({ trip, onGoRoute }: { trip: Trip; onGoRoute: () => voi
                       {a.reserve === 'booked' && <span className="tag ok">🎟️ geboekt</span>}
                       {a.place?.lat !== undefined && <span className="pin" title="Op de kaart">📍</span>}
                       {e.conflict && <small className="warn-text conflict-note">Te krap na het vorige onderdeel</small>}
+                      {hours && (
+                        <small className="warn-text conflict-note">
+                          🕑 {hours.message}
+                          {!e.fixed && !hours.closed ? ' (geschatte tijd)' : ''}
+                        </small>
+                      )}
                     </span>
                     <span className="meta">
                       {fmtHours(a.durationH)}

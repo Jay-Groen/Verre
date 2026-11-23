@@ -27,6 +27,8 @@ export interface Place {
   name: string
   lat?: number
   lng?: number
+  /** Openingstijden, bijv. 'Mo-Fr 09:00-17:00; Su off' (OpenStreetMap-notatie). */
+  hours?: string
 }
 
 /** Een stop op de route: een stad waar je overnacht, met je verblijf. */
@@ -49,6 +51,8 @@ export interface Stop {
   booking?: Booking
   notes?: string
   color: string
+  /** Wie het verblijf heeft betaald (voor kosten verdelen). */
+  paidBy?: string
 }
 
 export const TRANSPORT_MODES = ['Vlucht', 'Trein', 'Bus', 'Auto', 'Boot', 'Anders'] as const
@@ -83,6 +87,7 @@ export interface Leg {
   booked: boolean
   booking?: Booking
   notes?: string
+  paidBy?: string
 }
 
 export interface Activity {
@@ -101,6 +106,7 @@ export interface Activity {
   /** undefined = niet nodig om te reserveren. */
   reserve?: 'todo' | 'booked'
   booking?: Booking
+  paidBy?: string
 }
 
 export const IDEA_CATEGORIES = [
@@ -129,6 +135,8 @@ export interface Idea {
   /** 1 = must-do, 2 = graag, 3 = als er tijd is */
   priority: 1 | 2 | 3
   dropped: boolean
+  /** Wie dit idee leuk vindt (e-mailadres of naam). */
+  votes?: string[]
 }
 
 export const EXPENSE_CATEGORIES = [
@@ -148,6 +156,9 @@ export interface Expense {
   currency: Currency
   category: ExpenseCategory
   paid: boolean
+  paidBy?: string
+  /** Over wie de kosten verdeeld worden; leeg = iedereen. */
+  splitAmong?: string[]
 }
 
 export interface PackItem {
@@ -163,6 +174,8 @@ export interface Trip {
   startDate: string
   endDate: string
   travelers: number
+  /** Namen van de reizigers, voor kosten verdelen. */
+  people?: string[]
   /** Valuta waarin je rekent (meestal EUR). */
   homeCurrency: Currency
   /** Valuta op de bestemming. */

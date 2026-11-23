@@ -51,7 +51,7 @@ export function sampleJapanTrip(): Trip {
   })
 
   const stops = [
-    stop(0, 'Tokyo', '2027-04-01', '2027-04-06', 'Hotel in Shinjuku', 35.6938, 139.7034, 110000, true),
+    { ...stop(0, 'Tokyo', '2027-04-01', '2027-04-06', 'Hotel in Shinjuku', 35.6938, 139.7034, 110000, true), paidBy: 'Noor' },
     stop(1, 'Hakone', '2027-04-06', '2027-04-07', 'Ryokan met onsen', 35.2324, 139.1069, 48000, true),
     stop(2, 'Kyoto', '2027-04-07', '2027-04-11', 'Machiya bij Gion', 35.0037, 135.7756, 96000, false),
     stop(3, 'Osaka', '2027-04-11', '2027-04-14', 'Hotel in Namba', 34.6659, 135.5013, 54000, false),
@@ -60,12 +60,12 @@ export function sampleJapanTrip(): Trip {
 
   const leg = (to: string, l: Omit<Leg, 'id' | 'toId'>): Leg => ({ id: uid(), toId: to, ...l })
   const legs: Leg[] = [
-    leg(stops[0].id, { mode: 'Vlucht', date: '2027-03-31', depart: '14:40', arrive: '10:25', durationH: 12.75, carrier: 'KLM KL861', cost: 850, currency: 'EUR', booked: true, booking: { ref: 'XK7P2Q' } }),
+    leg(stops[0].id, { mode: 'Vlucht', date: '2027-03-31', depart: '14:40', arrive: '10:25', durationH: 12.75, carrier: 'KLM KL861', cost: 850, currency: 'EUR', booked: true, paidBy: 'Sam', booking: { ref: 'XK7P2Q' } }),
     leg(stops[1].id, { mode: 'Trein', date: '2027-04-06', depart: '10:10', arrive: '11:40', carrier: 'Odakyu Romancecar', cost: 4740, currency: 'JPY', booked: false }),
     leg(stops[2].id, { mode: 'Trein', date: '2027-04-07', depart: '10:30', arrive: '13:10', carrier: 'Shinkansen Hikari (via Odawara)', currency: 'JPY', booked: true, notes: 'Met JR Pass' }),
     leg(stops[3].id, { mode: 'Trein', date: '2027-04-11', depart: '11:00', arrive: '11:30', carrier: 'JR Special Rapid', currency: 'JPY', booked: true, notes: 'Met JR Pass' }),
     leg(stops[4].id, { mode: 'Trein', date: '2027-04-14', depart: '12:00', arrive: '14:30', carrier: 'Shinkansen Nozomi', cost: 29000, currency: 'JPY', booked: false }),
-    leg('home', { mode: 'Vlucht', date: '2027-04-15', depart: '10:55', arrive: '17:40', durationH: 13.75, carrier: 'KLM KL862', cost: 850, currency: 'EUR', booked: true, booking: { ref: 'XK7P2Q' } }),
+    leg('home', { mode: 'Vlucht', date: '2027-04-15', depart: '10:55', arrive: '17:40', durationH: 13.75, carrier: 'KLM KL862', cost: 850, currency: 'EUR', booked: true, paidBy: 'Sam', booking: { ref: 'XK7P2Q' } }),
   ]
 
   let order = 0
@@ -101,7 +101,7 @@ export function sampleJapanTrip(): Trip {
     act('2027-04-08', 'Fushimi Inari (vroeg!)', 34.9671, 135.7727, '07:00', 3),
     act('2027-04-08', 'Kiyomizu-dera', 34.9949, 135.785, '11:00', 2, 500),
     act('2027-04-09', 'Arashiyama bamboebos', 35.017, 135.6713, '08:00', 3),
-    act('2027-04-09', 'Kinkaku-ji', 35.0394, 135.7292, '13:30', 1.5, 500),
+    { ...act('2027-04-09', 'Kinkaku-ji', 35.0394, 135.7292, '13:30', 1.5, 500), place: { name: 'Kinkaku-ji', lat: 35.0394, lng: 135.7292, hours: 'Mo-Su 09:00-17:00' } },
     act('2027-04-12', 'Dagtrip Nara: herten & Tōdai-ji', 34.6851, 135.843, '09:00', 6, 1500),
     act('2027-04-12', 'Dōtonbori street food', 34.6687, 135.5013, '19:00', 2),
     act('2027-04-13', 'Osaka Castle', 34.6873, 135.5262, '10:00', 2, 600),
@@ -132,9 +132,9 @@ export function sampleJapanTrip(): Trip {
   })
 
   const ideas: Idea[] = [
-    idea('Ghibli Museum', 'Tokyo', 'Cultuur', 1, 3, 35.6962, 139.5704, 1000, 'Tickets gaan de 10e van de maand ervoor online.'),
+    { ...idea('Ghibli Museum', 'Tokyo', 'Cultuur', 1, 3, 35.6962, 139.5704, 1000, 'Tickets gaan de 10e van de maand ervoor online.'), votes: ['Sam', 'Noor'], place: { name: 'Ghibli Museum', lat: 35.6962, lng: 139.5704, hours: 'We-Mo 10:00-18:00; Tu off' } },
     idea('Tsukiji Outer Market ontbijt', 'Tokyo', 'Eten & drinken', 2, 2, 35.6655, 139.7707),
-    idea('Akihabara', 'Tokyo', 'Winkelen', 3, 3, 35.6984, 139.7731),
+    { ...idea('Akihabara', 'Tokyo', 'Winkelen', 3, 3, 35.6984, 139.7731), votes: ['Sam'] },
     idea('Nishiki Market', 'Kyoto', 'Eten & drinken', 2, 1.5, 35.005, 135.765),
     idea('Avondwandeling door Gion', 'Kyoto', 'Cultuur', 1, 2, 35.0037, 135.7756),
     idea('Universal Studios Japan', 'Osaka', 'Uitgaan', 2, 9, 34.6654, 135.4323, 9800, 'Neemt een hele dag in beslag.'),
@@ -149,6 +149,7 @@ export function sampleJapanTrip(): Trip {
     startDate: '2027-04-01',
     endDate: '2027-04-15',
     travelers: 2,
+    people: ['Sam', 'Noor'],
     homeCurrency: 'EUR',
     localCurrency: 'JPY',
     rate: 165,
@@ -159,7 +160,7 @@ export function sampleJapanTrip(): Trip {
     ideas,
     expenses: [
       { id: uid(), title: 'JR Pass 7 dagen (2 p.)', amount: 100000, currency: 'JPY', category: 'Vervoer', paid: false },
-      { id: uid(), title: 'Reisverzekering', amount: 60, currency: 'EUR', category: 'Overig', paid: true },
+      { id: uid(), title: 'Reisverzekering', amount: 60, currency: 'EUR', category: 'Overig', paid: true, paidBy: 'Noor' },
       { id: uid(), title: 'eSIM 15 dagen', amount: 25, currency: 'EUR', category: 'Overig', paid: false },
     ],
     packing: defaultPacking(),

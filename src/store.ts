@@ -8,15 +8,20 @@ import {
   loadRemote,
   saveLocal,
   saveRemote,
+  loadCache,
+  saveCache,
+  clearCache,
+  isNetworkError,
   type Access,
 } from './lib/storage'
 import { normalizeTrip } from './lib/migrate'
 import { removeMember } from './lib/sharing'
+import { clearCloudFiles } from './lib/files'
 import { defaultPacking } from './sample'
 import { addDays, todayIso } from './lib/dates'
 import { uid } from './lib/plan'
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'offline'
 
 interface User {
   id: string
@@ -35,6 +40,8 @@ interface State {
   error?: string
   /** Lokale reizen die nog niet naar het account zijn geüpload. */
   localTrips: Trip[]
+  /** Geen verbinding: je werkt met de offline kopie. */
+  offline: boolean
 
   init: () => void
   select: (id: string | null) => void
@@ -49,12 +56,49 @@ interface State {
 }
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
+/** Reizen met wijzigingen die nog naar Supabase moeten (bijv. omdat je offline was). */
+const pending = new Set<string>()
 
 export const useStore = create<State>((set, get) => {
+  const writeCache = () => {
+    const u = get().user
+    if (u) saveCache(u.id, { trips: get().trips, access: get().access, pending: [...pending] })
+  }
+
+  const upload = async (id: string) => {
+    const latest = get().trips.find((t) => t.id === id)
+    if (!latest) {
+      pending.delete(id)
+      return
+    }
+    try {
+      await saveRemote(latest, get().access[latest.id]?.owner ?? true)
+      pending.delete(id)
+      writeCache()
+      if (timers.size === 0 && pending.size === 0) set({ save: 'saved', offline: false })
+    } catch (e) {
+      pending.add(id)
+      writeCache()
+      if (isNetworkError(e)) set({ save: 'offline', offline: true })
+      else set({ save: 'error', error: (e as Error).message })
+    }
+  }
+
+  const retryPending = async () => {
+    for (const id of [...pending]) await upload(id)
+  }
+
   const persist = (trip: Trip) => {
     if (get().mode === 'local') {
       saveLocal(get().trips)
       set({ save: 'saved' })
+      return
+    }
+    // Altijd meteen een offline kopie, zodat niets verloren gaat zonder verbinding.
+    pending.add(trip.id)
+    writeCache()
+    if (get().offline && !navigator.onLine) {
+      set({ save: 'offline' })
       return
     }
     set({ save: 'saving' })
@@ -63,14 +107,7 @@ export const useStore = create<State>((set, get) => {
       trip.id,
       setTimeout(async () => {
         timers.delete(trip.id)
-        const latest = get().trips.find((t) => t.id === trip.id)
-        if (!latest) return
-        try {
-          await saveRemote(latest, get().access[latest.id]?.owner ?? true)
-          if (timers.size === 0) set({ save: 'saved' })
-        } catch (e) {
-          set({ save: 'error', error: (e as Error).message })
-        }
+        await upload(trip.id)
       }, 700),
     )
   }
@@ -82,12 +119,29 @@ export const useStore = create<State>((set, get) => {
       return
     }
     set({ user, ready: false })
+    const cache = loadCache(user.id)
+    cache?.pending.forEach((id) => pending.add(id))
     try {
-      const { trips, access } = await loadRemote(user.id)
-      set({ trips, access, ready: true, localTrips: loadLocal(), error: undefined })
+      const { trips: remote, access } = await loadRemote(user.id)
+      // Wijzigingen die offline zijn gemaakt, gaan voor op wat er online staat.
+      const trips = remote.map((r) => (pending.has(r.id) ? (cache?.trips.find((c) => c.id === r.id) ?? r) : r))
+      const unsent = (cache?.trips ?? []).filter((c) => pending.has(c.id) && !remote.some((r) => r.id === c.id))
+      set({
+        trips: [...unsent, ...trips],
+        access: { ...access, ...Object.fromEntries(unsent.map((t) => [t.id, cache?.access[t.id] ?? { owner: true }])) },
+        ready: true,
+        offline: false,
+        localTrips: loadLocal(),
+        error: undefined,
+      })
+      writeCache()
       listen()
+      retryPending()
     } catch (e) {
-      set({ trips: [], ready: true, error: (e as Error).message })
+      if (cache && isNetworkError(e)) {
+        set({ trips: cache.trips, access: cache.access, ready: true, offline: true, save: 'offline', error: undefined })
+        listen()
+      } else set({ trips: [], ready: true, error: (e as Error).message })
     }
   }
 
@@ -110,12 +164,22 @@ export const useStore = create<State>((set, get) => {
       .subscribe()
     document.addEventListener('visibilitychange', onFocus)
     window.addEventListener('focus', onFocus)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
   }
+  const onOnline = async () => {
+    set({ offline: false })
+    await retryPending()
+    get().refresh()
+  }
+  const onOffline = () => set({ offline: true, save: pending.size ? 'offline' : get().save })
   const stopListening = () => {
     if (channel) supabase?.removeChannel(channel)
     channel = null
     document.removeEventListener('visibilitychange', onFocus)
     window.removeEventListener('focus', onFocus)
+    window.removeEventListener('online', onOnline)
+    window.removeEventListener('offline', onOffline)
   }
 
   return {
@@ -127,6 +191,7 @@ export const useStore = create<State>((set, get) => {
     currentId: null,
     save: 'idle',
     localTrips: [],
+    offline: false,
 
     init: () => {
       let remembered: string | null = null
@@ -236,12 +301,17 @@ export const useStore = create<State>((set, get) => {
     },
 
     signOut: async () => {
+      const u = get().user
+      // Uitloggen wist de offline kopie, zodat de volgende gebruiker van dit apparaat niets ziet.
+      if (u) clearCache(u.id)
+      pending.clear()
+      await clearCloudFiles()
       await supabase?.auth.signOut()
     },
 
     refresh: async () => {
       const user = get().user
-      if (!supabase || !user) return
+      if (!supabase || !user || !navigator.onLine) return
       lastRefresh = Date.now()
       try {
         const { trips: remote, access } = await loadRemote(user.id)
@@ -249,12 +319,13 @@ export const useStore = create<State>((set, get) => {
         // Lokale wijzigingen die nog worden opgeslagen, of nieuwer zijn, gaan voor.
         const merged = remote.map((r) => {
           const l = local.find((x) => x.id === r.id)
-          return l && (timers.has(l.id) || l.updatedAt >= r.updatedAt) ? l : normalizeTrip(r)
+          return l && (timers.has(l.id) || pending.has(l.id) || l.updatedAt >= r.updatedAt) ? l : normalizeTrip(r)
         })
         const pendingNew = local.filter((l) => timers.has(l.id) && !remote.some((r) => r.id === l.id))
         set({ trips: [...pendingNew, ...merged], access: { ...access, ...Object.fromEntries(pendingNew.map((t) => [t.id, { owner: true }])) } })
         const cur = get().currentId
         if (cur && !get().trips.some((t) => t.id === cur)) get().select(null)
+        writeCache()
       } catch {
         /* volgende keer opnieuw */
       }
